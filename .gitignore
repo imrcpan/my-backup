@@ -6,3 +6,6 @@ dist/
 .vs/
 .idea/
 *.log
+
+# The built web interface, made by the web build.
+src/Backup.Server/wwwroot/
