@@ -69,6 +69,26 @@ public sealed partial class ResticClient(IProcessRunner runner, ResticOptions? o
 
     public const int MaxPlanItems = 500;
 
+    public async Task InitFromAsync(ResticRepository repository, ResticRepository source, CancellationToken cancellationToken = default)
+    {
+        if (await ExistsAsync(repository, cancellationToken))
+        {
+            throw new ExternalToolException("repo_exists", "A repository exists at this location already.");
+        }
+
+        ProcessResult result = await RunRawAsync(
+            repository, ["init", "--json", "--from-repo", source.Location, "--copy-chunker-params"], null, cancellationToken, from: source);
+        Ensure(repository, result, source);
+    }
+
+    public async Task CopyAsync(ResticRepository repository, ResticRepository source, string snapshotId, Action<string>? onLine = null, CancellationToken cancellationToken = default)
+    {
+        ValidateSnapshotIds([snapshotId]);
+        ProcessResult result = await RunRawAsync(
+            repository, ["copy", "--from-repo", source.Location, "--", snapshotId], onLine, cancellationToken, captureOutput: false, from: source);
+        Ensure(repository, result, source);
+    }
+
     public Task<ResticForgetPlan> PlanForgetAsync(ResticRepository repository, RetentionPolicy policy, CancellationToken cancellationToken = default) =>
         ForgetByPolicyAsync(repository, policy, dryRun: true, cancellationToken);
 
@@ -401,7 +421,8 @@ public sealed partial class ResticClient(IProcessRunner runner, ResticOptions? o
         IReadOnlyList<string> arguments,
         Action<string>? onLine,
         CancellationToken cancellationToken,
-        bool captureOutput = true)
+        bool captureOutput = true,
+        ResticRepository? from = null)
     {
         List<string> all = ["-r", repository.Location, .. arguments];
         Dictionary<string, string?> environment = new()
@@ -415,6 +436,11 @@ public sealed partial class ResticClient(IProcessRunner runner, ResticOptions? o
             ["RESTIC_PASSWORD_COMMAND"] = null,
             ["RESTIC_FROM_REPOSITORY"] = null,
         };
+        if (from != null)
+        {
+            environment["RESTIC_FROM_PASSWORD"] = from.Password;
+        }
+
         if (_options.RcloneConfigFile != null)
         {
             environment["RCLONE_CONFIG"] = _options.RcloneConfigFile;
@@ -424,7 +450,7 @@ public sealed partial class ResticClient(IProcessRunner runner, ResticOptions? o
     }
 
     /// <summary>Turns a failed run into an <see cref="ExternalToolException"/> with a stable code.</summary>
-    internal static void Ensure(ResticRepository repository, ProcessResult result)
+    internal static void Ensure(ResticRepository repository, ProcessResult result, ResticRepository? from = null)
     {
         if (result.Succeeded)
         {
@@ -439,7 +465,7 @@ public sealed partial class ResticClient(IProcessRunner runner, ResticOptions? o
             ExitIncomplete => "backup_incomplete",
             _ => "restic_failed",
         };
-        string detail = new SecretRedactor([repository.Password]).Redact(result.StandardError).Trim();
+        string detail = new SecretRedactor([repository.Password, from?.Password]).Redact(result.StandardError).Trim();
         throw new ExternalToolException(code, detail.Length == 0 ? $"restic exited with code {result.ExitCode}." : detail, result.ExitCode);
     }
 }

@@ -57,4 +57,13 @@ public interface IResticClient
         int subsetPercent = 10,
         Action<string>? onLine = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates a repository that shares the chunking of another one, so that copying
+    /// snapshots between them stores no data twice.
+    /// </summary>
+    Task InitFromAsync(ResticRepository repository, ResticRepository source, CancellationToken cancellationToken = default);
+
+    /// <summary>Copies one snapshot into <paramref name="repository"/>; a snapshot that is there already is skipped.</summary>
+    Task CopyAsync(ResticRepository repository, ResticRepository source, string snapshotId, Action<string>? onLine = null, CancellationToken cancellationToken = default);
 }

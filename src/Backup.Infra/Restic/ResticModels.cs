@@ -10,10 +10,19 @@ public sealed record ResticSnapshot(
     string Id,
     string ShortId,
     DateTimeOffset Time,
+    string Tree,
     string[] Paths,
     string Hostname,
     string[]? Tags,
-    ResticSnapshotSummary? Summary);
+    ResticSnapshotSummary? Summary)
+{
+    /// <summary>
+    /// A copy of a snapshot into another repository has a new id but the same tree, paths,
+    /// time and host; that is how an earlier copy is recognized.
+    /// </summary>
+    public bool SameContentAs(ResticSnapshot other) =>
+        Tree == other.Tree && Time == other.Time && Hostname == other.Hostname && Paths.SequenceEqual(other.Paths);
+}
 
 public sealed record ResticSnapshotSummary(
     long FilesNew,
