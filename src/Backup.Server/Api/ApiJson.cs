@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Backup.Core;
+using Backup.Infra.Restic;
 
 namespace Backup.Server.Api;
 
@@ -19,5 +20,7 @@ public sealed record Pong(string Status);
 [JsonSerializable(typeof(NameRequest))]
 [JsonSerializable(typeof(ObjectRequest))]
 [JsonSerializable(typeof(RetentionRequest))]
+[JsonSerializable(typeof(SnapshotDto[]))]
+[JsonSerializable(typeof(ResticNode[]))]
 [JsonSerializable(typeof(SystemDto))]
 internal sealed partial class ApiJson : JsonSerializerContext;

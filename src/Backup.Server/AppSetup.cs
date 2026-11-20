@@ -1,3 +1,4 @@
+using Backup.App.Browsing;
 using Backup.App.Execution;
 using Backup.App.Planning;
 using Backup.Core;
@@ -56,6 +57,7 @@ public static class AppSetup
         services.AddSingleton<IRunLog>(sp => new RunLog(Path.Combine(DataDirectory(sp.GetRequiredService<IConfiguration>()), "logs")));
         services.AddSingleton<RunPlanner>();
         services.AddSingleton<RunService>();
+        services.AddSingleton<RepositoryReader>();
         return services;
     }
 }

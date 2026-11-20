@@ -19,6 +19,7 @@ ErrorMapping.Use(app);
 app.MapGet("/api/ping", () => new Pong("ok"));
 DeviceEndpoints.Map(app);
 GroupEndpoints.Map(app);
+SnapshotEndpoints.Map(app);
 SystemEndpoints.Map(app);
 
 app.Lifetime.ApplicationStopping.Register(() => app.Services.GetRequiredService<RunService>().ShutdownAsync().GetAwaiter().GetResult());
