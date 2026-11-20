@@ -1,10 +1,15 @@
 using Backup.App.Execution;
 using Backup.Server;
+using System.Text.Json.Serialization;
 using Backup.Server.Api;
 
 WebApplicationBuilder builder = WebApplication.CreateSlimBuilder(args);
 builder.WebHost.ConfigureKestrel(kestrel => kestrel.ListenLocalhost(builder.Configuration.GetValue("Port", 5174)));
-builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.TypeInfoResolverChain.Insert(0, ApiJson.Default));
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.TypeInfoResolverChain.Insert(0, ApiJson.Default);
+    options.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+});
 builder.Services.AddBackupServices();
 
 WebApplication app = builder.Build();
@@ -13,6 +18,7 @@ ErrorMapping.Use(app);
 
 app.MapGet("/api/ping", () => new Pong("ok"));
 DeviceEndpoints.Map(app);
+GroupEndpoints.Map(app);
 
 app.Lifetime.ApplicationStopping.Register(() => app.Services.GetRequiredService<RunService>().ShutdownAsync().GetAwaiter().GetResult());
 
