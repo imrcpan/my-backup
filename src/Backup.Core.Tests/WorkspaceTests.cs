@@ -86,6 +86,36 @@ public class WorkspaceTests
     }
 
     [Fact]
+    public void Data_on_a_cloud_drive_must_be_encrypted()
+    {
+        Workspace workspace = new(new MemoryStore());
+        string group = workspace.Write((_, groups) => groups.AddGroup("G")).Id;
+        Assert.Equal("cloud_requires_encryption", CodeOf(() => workspace.AddObject(group, "gdrive", "/x", false, null)));
+        Assert.Empty(workspace.Read((_, groups) => groups.Get(group).Objects));
+
+        StorageObject item = workspace.AddObject(group, "gdrive", "/x", true, "pw");
+        Assert.Equal("cloud_requires_encryption", CodeOf(() => workspace.UpdateObject(group, item.Id, "gdrive", "/x", false, null)));
+        Assert.True(workspace.Read((_, groups) => groups.Get(group).Objects.Single().Encrypted));
+
+        // A plain object on a local device may not be moved to the cloud either.
+        StorageObject plain = workspace.AddObject(group, "local", "/data", false, null);
+        Assert.Equal("cloud_requires_encryption", CodeOf(() => workspace.UpdateObject(group, plain.Id, "gdrive", "/data", false, null)));
+    }
+
+    [Fact]
+    public void A_device_in_use_by_a_plain_object_cannot_become_a_cloud_drive()
+    {
+        Workspace workspace = new(new MemoryStore());
+        string group = workspace.Write((_, groups) => groups.AddGroup("G")).Id;
+        workspace.Write((devices, _) => devices.Add(new("disk", "Disk", StorageDeviceKind.ExternalDisk, Uuid: "AAAA-AAAA")));
+        workspace.AddObject(group, "disk", "/x", false, null);
+
+        StorageDevice asCloud = new("disk", "Disk", StorageDeviceKind.Rclone, RcloneRemote: "r");
+        Assert.Equal("cloud_requires_encryption", CodeOf(() => workspace.UpdateDevice("disk", asCloud)));
+        Assert.Equal(StorageDeviceKind.ExternalDisk, workspace.Read((devices, _) => devices.Find("disk")!.Kind));
+    }
+
+    [Fact]
     public async Task Concurrent_changes_do_not_lose_any()
     {
         MemoryStore store = new();

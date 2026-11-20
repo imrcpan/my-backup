@@ -28,7 +28,7 @@ public sealed class Workspace
         }
     }
 
-    /// <summary>Changes under the lock and saves. If the change throws, nothing is saved.</summary>
+    /// <summary>Changes under the lock and saves. If the change throws, nothing is saved; a change must therefore check before it mutates.</summary>
     public T Write<T>(Func<StorageDeviceCatalog, BackupGroupCatalog, T> change)
     {
         lock (_gate)
@@ -51,24 +51,38 @@ public sealed class Workspace
         return 0;
     });
 
-    /// <summary>The device must exist; only its id is used from then on.</summary>
+    /// <summary>A cloud drive may not become the home of a plain object, so the kind of a device in use cannot turn into one.</summary>
+    public StorageDevice UpdateDevice(string deviceId, StorageDevice device) => Write((devices, groups) =>
+    {
+        // Checked before the catalog is changed, so a refusal leaves everything as it was.
+        if (device.Kind == StorageDeviceKind.Rclone && groups.Groups.Any(g => g.Objects.Any(o => o.DeviceId == deviceId && !o.Encrypted)))
+        {
+            throw new DomainException("cloud_requires_encryption", "A plain object still uses this device, and data on a cloud drive must be encrypted.");
+        }
+
+        return devices.Update(deviceId, device);
+    });
+
+    /// <summary>The device must exist; only its id is used from then on. Data on a cloud drive must be encrypted.</summary>
     public StorageObject AddObject(string groupId, string? deviceId, string? path, bool encrypted, string? password) => Write((devices, groups) =>
     {
-        EnsureDevice(devices, deviceId);
+        EnsureDevice(devices, deviceId, encrypted);
         return groups.AddObject(groupId, deviceId, path, encrypted, password);
     });
 
     public StorageObject UpdateObject(string groupId, string objectId, string? deviceId, string? path, bool encrypted, string? password) => Write((devices, groups) =>
     {
-        EnsureDevice(devices, deviceId);
+        EnsureDevice(devices, deviceId, encrypted);
         return groups.UpdateObject(groupId, objectId, deviceId, path, encrypted, password);
     });
 
-    private static void EnsureDevice(StorageDeviceCatalog devices, string? deviceId)
+    private static void EnsureDevice(StorageDeviceCatalog devices, string? deviceId, bool encrypted)
     {
-        if (devices.Find((deviceId ?? "").Trim()) == null)
+        StorageDevice device = devices.Find((deviceId ?? "").Trim())
+            ?? throw new DomainException("device_not_found", "The storage device does not exist.");
+        if (device.Kind == StorageDeviceKind.Rclone && !encrypted)
         {
-            throw new DomainException("device_not_found", "The storage device does not exist.");
+            throw new DomainException("cloud_requires_encryption", "Data on a cloud drive must be encrypted.");
         }
     }
 }
