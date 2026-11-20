@@ -117,6 +117,33 @@ public class BackupGroupCatalogTests
     }
 
     [Fact]
+    public void Retention_belongs_to_an_encrypted_object_and_survives_an_update()
+    {
+        BackupGroupCatalog catalog = new();
+        string group = catalog.AddGroup("G").Id;
+        StorageObject repo = catalog.AddObject(group, "gdrive", "/r", true, "pw");
+        StorageObject plain = catalog.AddObject(group, "local", "/p", false, null);
+
+        Assert.Equal(new RetentionPolicy(KeepLast: 5), catalog.SetRetention(group, repo.Id, new RetentionPolicy(KeepLast: 5)).Retention);
+        Assert.Equal("retention_needs_repository", CodeOf(() => catalog.SetRetention(group, plain.Id, new RetentionPolicy(KeepLast: 1))));
+        Assert.Equal("retention_empty", CodeOf(() => catalog.SetRetention(group, repo.Id, new RetentionPolicy())));
+        Assert.Equal("object_not_found", CodeOf(() => catalog.SetRetention(group, "nope", null)));
+
+        Assert.Equal(5, catalog.UpdateObject(group, repo.Id, "gdrive", "/r2", true, "").Retention!.KeepLast);
+        Assert.Null(catalog.SetRetention(group, repo.Id, null).Retention);
+    }
+
+    [Fact]
+    public void Retention_is_dropped_when_an_object_stops_being_encrypted()
+    {
+        BackupGroupCatalog catalog = new();
+        string group = catalog.AddGroup("G").Id;
+        StorageObject repo = catalog.AddObject(group, "local", "/r", true, "pw");
+        catalog.SetRetention(group, repo.Id, new RetentionPolicy(KeepLast: 2));
+        Assert.Null(catalog.UpdateObject(group, repo.Id, "local", "/r", false, null).Retention);
+    }
+
+    [Fact]
     public void Removing_forgets_configuration_only()
     {
         BackupGroupCatalog catalog = new();

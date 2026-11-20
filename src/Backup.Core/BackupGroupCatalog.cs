@@ -68,8 +68,28 @@ public sealed class BackupGroupCatalog
         }
 
         StorageObject old = group.Objects[index];
-        StorageObject item = Build(old.Id, deviceId, path, encrypted, password, old.Password);
+        StorageObject item = Build(old.Id, deviceId, path, encrypted, password, old.Password) with { Retention = encrypted ? old.Retention : null };
         EnsureLocationFree(group, item);
+        group.Objects[index] = item;
+        return item;
+    }
+
+    /// <summary>Sets how many snapshots of an encrypted object are kept; null removes the policy.</summary>
+    public StorageObject SetRetention(string groupId, string objectId, RetentionPolicy? policy)
+    {
+        BackupGroup group = Get(groupId);
+        int index = group.Objects.FindIndex(o => o.Id == objectId);
+        if (index < 0)
+        {
+            throw new DomainException("object_not_found", "The storage object does not exist.");
+        }
+
+        if (policy != null && !group.Objects[index].Encrypted)
+        {
+            throw new DomainException("retention_needs_repository", "Only an encrypted object holds snapshots.");
+        }
+
+        StorageObject item = group.Objects[index] with { Retention = policy?.Validated() };
         group.Objects[index] = item;
         return item;
     }

@@ -9,4 +9,5 @@ namespace Backup.Core;
 /// <param name="DeviceId">Only the id of the device is kept, never its details.</param>
 /// <param name="Path">Normalized by <see cref="StoragePath"/>.</param>
 /// <param name="Password">Set if and only if <paramref name="Encrypted"/> is true.</param>
-public sealed record StorageObject(string Id, string DeviceId, string Path, bool Encrypted, string? Password);
+/// <param name="Retention">Which snapshots to keep; only for an encrypted object, which is a restic repository.</param>
+public sealed record StorageObject(string Id, string DeviceId, string Path, bool Encrypted, string? Password, RetentionPolicy? Retention = null);
