@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Backup.Core.Tests/Backup.Core.Tests.csproj" />
+  <Project Path="Backup.Core/Backup.Core.csproj" />
+</Solution>
