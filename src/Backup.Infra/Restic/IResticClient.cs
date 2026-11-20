@@ -20,4 +20,17 @@ public interface IResticClient
         string sourceDirectory,
         Action<ResticBackupProgress>? onProgress = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Restores a snapshot, or only the given paths of it, below a new directory.
+    /// Nothing is ever restored over existing files: the target must not exist or must be empty.
+    /// </summary>
+    /// <exception cref="ExternalToolException">"restore_target_not_empty" if the target holds anything.</exception>
+    Task<ResticRestoreSummary> RestoreAsync(
+        ResticRepository repository,
+        string snapshotId,
+        string targetDirectory,
+        IReadOnlyList<string>? paths = null,
+        Action<ResticRestoreProgress>? onProgress = null,
+        CancellationToken cancellationToken = default);
 }

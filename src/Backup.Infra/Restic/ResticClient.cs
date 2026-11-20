@@ -164,6 +164,77 @@ public sealed class ResticClient(IProcessRunner runner, ResticOptions? options =
             errors);
     }
 
+    public async Task<ResticRestoreSummary> RestoreAsync(
+        ResticRepository repository,
+        string snapshotId,
+        string targetDirectory,
+        IReadOnlyList<string>? paths = null,
+        Action<ResticRestoreProgress>? onProgress = null,
+        CancellationToken cancellationToken = default)
+    {
+        string target = Path.GetFullPath(targetDirectory);
+        if (File.Exists(target) || (Directory.Exists(target) && Directory.EnumerateFileSystemEntries(target).Any()))
+        {
+            throw new ExternalToolException("restore_target_not_empty", "The restore target must be a new or empty directory.");
+        }
+
+        List<string> arguments = ["restore", "--json", "--verify", snapshotId, "--target", target];
+        foreach (string path in paths ?? [])
+        {
+            arguments.Add("--include");
+            arguments.Add(EscapePattern(path));
+        }
+
+        JsonElement? summary = null;
+        ProcessResult result = await RunRawAsync(
+            repository,
+            arguments,
+            line =>
+            {
+                JsonElement? message = ParseLine(line);
+                switch (message?.GetProperty("message_type").GetString())
+                {
+                    case "summary":
+                        summary = message;
+                        break;
+                    case "status":
+                        onProgress?.Invoke(new ResticRestoreProgress(
+                            Number(message.Value, "percent_done"),
+                            (long)Number(message.Value, "files_restored"),
+                            (long)Number(message.Value, "total_files"),
+                            (long)Number(message.Value, "bytes_restored"),
+                            (long)Number(message.Value, "total_bytes")));
+                        break;
+                }
+            },
+            cancellationToken,
+            captureOutput: false);
+        Ensure(repository, result);
+        JsonElement s = summary ?? throw new ExternalToolException("restic_output", "restic did not report a summary.");
+        return new ResticRestoreSummary(
+            s.GetProperty("files_restored").GetInt64(),
+            s.GetProperty("total_files").GetInt64(),
+            s.GetProperty("bytes_restored").GetInt64(),
+            s.GetProperty("total_bytes").GetInt64());
+    }
+
+    /// <summary>A path is meant literally; the characters that restic reads as a pattern are escaped.</summary>
+    internal static string EscapePattern(string path)
+    {
+        System.Text.StringBuilder result = new();
+        foreach (char c in path)
+        {
+            if (c is '\\' or '*' or '?' or '[')
+            {
+                result.Append('\\');
+            }
+
+            result.Append(c);
+        }
+
+        return result.ToString();
+    }
+
     private static JsonElement? ParseLine(string line)
     {
         try
