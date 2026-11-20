@@ -49,4 +49,12 @@ public interface IResticClient
 
     /// <summary>Deletes the data that no snapshot uses any more. This frees space and cannot be undone.</summary>
     Task PruneAsync(ResticRepository repository, Action<string>? onLine = null, CancellationToken cancellationToken = default);
+
+    /// <param name="subsetPercent">Share of the data to read, 1 to 100, for <see cref="ResticCheckMode.Subset"/>.</param>
+    Task<ResticCheckResult> CheckAsync(
+        ResticRepository repository,
+        ResticCheckMode mode,
+        int subsetPercent = 10,
+        Action<string>? onLine = null,
+        CancellationToken cancellationToken = default);
 }

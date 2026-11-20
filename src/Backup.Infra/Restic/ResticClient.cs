@@ -139,6 +139,54 @@ public sealed partial class ResticClient(IProcessRunner runner, ResticOptions? o
     public async Task PruneAsync(ResticRepository repository, Action<string>? onLine = null, CancellationToken cancellationToken = default) =>
         Ensure(repository, await RunRawAsync(repository, ["prune"], onLine, cancellationToken, captureOutput: false));
 
+    public async Task<ResticCheckResult> CheckAsync(
+        ResticRepository repository,
+        ResticCheckMode mode,
+        int subsetPercent = 10,
+        Action<string>? onLine = null,
+        CancellationToken cancellationToken = default)
+    {
+        List<string> arguments = ["check"];
+        switch (mode)
+        {
+            case ResticCheckMode.Subset when subsetPercent is < 1 or > 100:
+                throw new ExternalToolException("check_subset_invalid", "The share to read must be between 1 and 100 percent.");
+            case ResticCheckMode.Subset:
+                arguments.Add("--read-data-subset");
+                arguments.Add(subsetPercent.ToString(System.Globalization.CultureInfo.InvariantCulture) + "%");
+                break;
+            case ResticCheckMode.Full:
+                arguments.Add("--read-data");
+                break;
+        }
+
+        Queue<string> tail = new();
+        ProcessResult result = await RunRawAsync(
+            repository,
+            arguments,
+            line =>
+            {
+                tail.Enqueue(line);
+                while (tail.Count > 40)
+                {
+                    tail.Dequeue();
+                }
+
+                onLine?.Invoke(line);
+            },
+            cancellationToken,
+            captureOutput: false);
+
+        // Exit code 1 means restic found errors in the repository: that is the answer, not a failure to ask.
+        if (result.ExitCode != 1)
+        {
+            Ensure(repository, result);
+        }
+
+        string output = string.Join('\n', tail) + (result.StandardError.Length > 0 ? "\n" + result.StandardError : "");
+        return new ResticCheckResult(result.Succeeded, new SecretRedactor([repository.Password]).Redact(output).Trim());
+    }
+
     [GeneratedRegex("^[0-9a-fA-F]{8,64}$")]
     private static partial Regex SnapshotIdPattern();
 
