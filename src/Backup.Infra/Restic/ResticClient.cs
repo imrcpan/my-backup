@@ -65,6 +65,130 @@ public sealed class ResticClient(IProcessRunner runner, ResticOptions? options =
         return nodes;
     }
 
+    public const int MaxPlanItems = 500;
+
+    public async Task<ResticBackupPlan> PlanBackupAsync(ResticRepository repository, string sourceDirectory, CancellationToken cancellationToken = default)
+    {
+        List<ResticPlanItem> items = [];
+        long total = 0;
+        JsonElement? summary = null;
+        ProcessResult result = await RunRawAsync(
+            repository,
+            ["backup", "--json", "-vv", "--dry-run", "--", sourceDirectory],
+            line =>
+            {
+                JsonElement? message = ParseLine(line);
+                string? type = message?.GetProperty("message_type").GetString();
+                if (type == "summary")
+                {
+                    summary = message;
+                }
+                else if (type == "verbose_status"
+                    && message!.Value.GetProperty("action").GetString() is "new" or "modified"
+                    && !message.Value.GetProperty("item").GetString()!.EndsWith('/'))
+                {
+                    total++;
+                    if (items.Count < MaxPlanItems)
+                    {
+                        items.Add(new ResticPlanItem(
+                            message.Value.GetProperty("action").GetString()!,
+                            message.Value.GetProperty("item").GetString()!,
+                            message.Value.GetProperty("data_size").GetInt64()));
+                    }
+                }
+            },
+            cancellationToken,
+            captureOutput: false);
+        Ensure(repository, result);
+        JsonElement s = summary ?? throw new ExternalToolException("restic_output", "restic did not report a summary.");
+        return new ResticBackupPlan(
+            s.GetProperty("files_new").GetInt64(),
+            s.GetProperty("files_changed").GetInt64(),
+            s.GetProperty("files_unmodified").GetInt64(),
+            s.GetProperty("total_bytes_processed").GetInt64(),
+            s.GetProperty("data_added").GetInt64(),
+            items,
+            total > items.Count);
+    }
+
+    public async Task<ResticBackupSummary> BackupAsync(
+        ResticRepository repository,
+        string sourceDirectory,
+        Action<ResticBackupProgress>? onProgress = null,
+        CancellationToken cancellationToken = default)
+    {
+        JsonElement? summary = null;
+        List<string> errors = [];
+        ProcessResult result = await RunRawAsync(
+            repository,
+            ["backup", "--json", "--", sourceDirectory],
+            line =>
+            {
+                JsonElement? message = ParseLine(line);
+                switch (message?.GetProperty("message_type").GetString())
+                {
+                    case "summary":
+                        summary = message;
+                        break;
+                    case "status":
+                        onProgress?.Invoke(new ResticBackupProgress(
+                            Number(message.Value, "percent_done"),
+                            (long)Number(message.Value, "files_done"),
+                            (long)Number(message.Value, "total_files"),
+                            (long)Number(message.Value, "bytes_done"),
+                            (long)Number(message.Value, "total_bytes")));
+                        break;
+                    case "error":
+                        errors.Add(ErrorText(message.Value));
+                        break;
+                }
+            },
+            cancellationToken,
+            captureOutput: false);
+
+        bool incomplete = result.ExitCode == ExitIncomplete;
+        if (!incomplete)
+        {
+            Ensure(repository, result);
+        }
+
+        JsonElement s = summary ?? throw new ExternalToolException("restic_output", "restic did not report a summary.", result.ExitCode);
+        return new ResticBackupSummary(
+            s.GetProperty("snapshot_id").GetString() ?? "",
+            s.GetProperty("files_new").GetInt64(),
+            s.GetProperty("files_changed").GetInt64(),
+            s.GetProperty("files_unmodified").GetInt64(),
+            s.GetProperty("data_added").GetInt64(),
+            s.GetProperty("total_bytes_processed").GetInt64(),
+            incomplete,
+            errors);
+    }
+
+    private static JsonElement? ParseLine(string line)
+    {
+        try
+        {
+            JsonElement element = JsonDocument.Parse(line).RootElement.Clone();
+            return element.ValueKind == JsonValueKind.Object && element.TryGetProperty("message_type", out _) ? element : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static double Number(JsonElement element, string name) =>
+        element.TryGetProperty(name, out JsonElement value) && value.ValueKind == JsonValueKind.Number ? value.GetDouble() : 0;
+
+    private static string ErrorText(JsonElement message)
+    {
+        string text = message.TryGetProperty("error", out JsonElement error) && error.TryGetProperty("message", out JsonElement m)
+            ? m.GetString() ?? ""
+            : "";
+        string item = message.TryGetProperty("item", out JsonElement i) ? i.GetString() ?? "" : "";
+        return item.Length == 0 ? text : $"{item}: {text}";
+    }
+
     internal const int ExitIncomplete = 3;
     internal const int ExitRepositoryMissing = 10;
     internal const int ExitLocked = 11;
