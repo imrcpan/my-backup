@@ -13,6 +13,10 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <InternalsVisibleTo Include="Backup.Infra.Tests" />
+    </ItemGroup>
+
+    <ItemGroup>
         <ProjectReference Include="../Backup.Core/Backup.Core.csproj" />
     </ItemGroup>
 
