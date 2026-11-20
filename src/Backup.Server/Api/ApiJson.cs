@@ -19,4 +19,5 @@ public sealed record Pong(string Status);
 [JsonSerializable(typeof(NameRequest))]
 [JsonSerializable(typeof(ObjectRequest))]
 [JsonSerializable(typeof(RetentionRequest))]
+[JsonSerializable(typeof(SystemDto))]
 internal sealed partial class ApiJson : JsonSerializerContext;
