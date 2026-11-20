@@ -19,6 +19,8 @@
 
     <PropertyGroup Condition="'$(Configuration)' == 'Release'">
         <PublishAot>true</PublishAot>
+        <!-- An advisory against the preview compiler package itself; it is reported, but it does not stop a publish. -->
+        <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1903</WarningsNotAsErrors>
     </PropertyGroup>
 
     <ItemGroup>
