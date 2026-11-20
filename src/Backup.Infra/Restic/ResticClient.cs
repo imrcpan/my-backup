@@ -415,6 +415,11 @@ public sealed partial class ResticClient(IProcessRunner runner, ResticOptions? o
             ["RESTIC_PASSWORD_COMMAND"] = null,
             ["RESTIC_FROM_REPOSITORY"] = null,
         };
+        if (_options.RcloneConfigFile != null)
+        {
+            environment["RCLONE_CONFIG"] = _options.RcloneConfigFile;
+        }
+
         return runner.RunAsync(new ProcessSpec(_options.ExecutablePath, all, environment, CaptureStandardOutput: captureOutput), onLine, null, cancellationToken);
     }
 
