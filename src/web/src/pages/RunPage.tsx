@@ -154,8 +154,15 @@ export function RunPage() {
 
           {data.state === 'Planned' && (
             <>
-              <Alert variant={blocked ? 'destructive' : 'default'}>
-                <AlertDescription>{blocked ? t('run.plan.blocked') : t('run.plan.expires')}</AlertDescription>
+              <Alert variant={blocked || data.destructive ? 'destructive' : 'default'}>
+                {data.destructive && <AlertTriangleIcon />}
+                <AlertDescription>
+                  {blocked
+                    ? t('run.plan.blocked')
+                    : data.destructive
+                      ? t('run.start.destructive')
+                      : t('run.plan.expires')}
+                </AlertDescription>
               </Alert>
               <div className="flex flex-wrap gap-2">
                 <Button

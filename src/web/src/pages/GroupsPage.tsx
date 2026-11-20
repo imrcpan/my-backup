@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  ArchiveRestoreIcon,
   CalendarClockIcon,
   KeyRoundIcon,
   LayersIcon,
@@ -12,6 +13,7 @@ import {
   PlusIcon,
   Trash2Icon,
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { DeviceStatusBadge } from '@/components/device-status'
 import { NameDialog } from '@/components/name-dialog'
 import { NewRunDialog } from '@/components/new-run-dialog'
@@ -53,6 +55,7 @@ export function GroupsPage() {
   const { t } = useI18n()
   const notify = useNotify()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const groups = useQuery({ queryKey: ['groups'], queryFn: api.groups.list })
   const devices = useQuery({ queryKey: ['devices'], queryFn: api.devices.list })
 
@@ -248,6 +251,14 @@ export function GroupsPage() {
                                   <PencilIcon />
                                   {t('common.edit')}
                                 </DropdownMenuItem>
+                                {object.encrypted && (
+                                  <DropdownMenuItem
+                                    onClick={() => void navigate(`/groups/${group.id}/objects/${object.id}`)}
+                                  >
+                                    <ArchiveRestoreIcon />
+                                    {t('groups.menu.snapshots')}
+                                  </DropdownMenuItem>
+                                )}
                                 {object.encrypted && (
                                   <DropdownMenuItem onClick={() => setRetentionTarget({ group, object })}>
                                     <CalendarClockIcon />
