@@ -4,6 +4,7 @@ import { Page } from '@/components/page'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { useI18n } from '@/lib/i18n'
 import { DevicesPage } from '@/pages/DevicesPage'
+import { GroupsPage } from '@/pages/GroupsPage'
 import { Placeholder } from '@/pages/Placeholder'
 
 function NotFound() {
@@ -22,10 +23,7 @@ export default function App() {
       <SidebarInset className="min-w-0">
         <Routes>
           <Route path="/" element={<Navigate to="/groups" replace />} />
-          <Route
-            path="/groups"
-            element={<Placeholder title="page.groups.title" description="page.groups.description" />}
-          />
+          <Route path="/groups" element={<GroupsPage />} />
           <Route path="/devices" element={<DevicesPage />} />
           <Route path="/runs" element={<Placeholder title="page.runs.title" description="page.runs.description" />} />
           <Route path="*" element={<NotFound />} />
