@@ -1,4 +1,6 @@
 <Solution>
+  <Project Path="Backup.App.Tests/Backup.App.Tests.csproj" />
+  <Project Path="Backup.App/Backup.App.csproj" />
   <Project Path="Backup.Core.Tests/Backup.Core.Tests.csproj" />
   <Project Path="Backup.Core/Backup.Core.csproj" />
   <Project Path="Backup.Infra.Tests/Backup.Infra.Tests.csproj" />

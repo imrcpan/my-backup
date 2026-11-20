@@ -73,6 +73,42 @@ public sealed class PlanLine
     public long Size { get; set; }
 }
 
+public enum CheckDepth
+{
+    Structure,
+    Subset,
+    Full,
+}
+
+/// <summary>What a step needs besides its object. They are fixed when the plan is made, so the run does what was shown.</summary>
+public sealed class StepArguments
+{
+    /// <summary>The snapshot to copy or restore.</summary>
+    public string? SnapshotId { get; set; }
+
+    /// <summary>The directory inside the snapshot that becomes the top of a restore, if the snapshot has just one.</summary>
+    public string? SnapshotPath { get; set; }
+
+    /// <summary>The new directory a restore writes into.</summary>
+    public string? TargetDirectory { get; set; }
+
+    /// <summary>The paths of a snapshot to restore; all of it if empty.</summary>
+    public List<string> Paths { get; set; } = [];
+
+    /// <summary>The snapshots to forget, if they were chosen one by one.</summary>
+    public List<string> SnapshotIds { get; set; } = [];
+
+    /// <summary>The policy to forget by, if no snapshots were chosen.</summary>
+    public RetentionPolicy? Retention { get; set; }
+
+    public CheckDepth CheckDepth { get; set; }
+
+    public int SubsetPercent { get; set; } = 10;
+
+    /// <summary>Whether a prune follows a forget.</summary>
+    public bool PruneAfter { get; set; }
+}
+
 /// <summary>One thing a run does to one storage object.</summary>
 public sealed class RunStep
 {
@@ -84,6 +120,8 @@ public sealed class RunStep
     public string TargetObjectId { get; set; } = "";
 
     public StepState State { get; set; }
+
+    public StepArguments Arguments { get; set; } = new();
 
     /// <summary>The diff shown to the user. Cut to a fixed number of lines.</summary>
     public List<PlanLine> Lines { get; set; } = [];
