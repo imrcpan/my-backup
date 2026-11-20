@@ -8,11 +8,13 @@ import {
   LockOpenIcon,
   MoreHorizontalIcon,
   PencilIcon,
+  PlayIcon,
   PlusIcon,
   Trash2Icon,
 } from 'lucide-react'
 import { DeviceStatusBadge } from '@/components/device-status'
 import { NameDialog } from '@/components/name-dialog'
+import { NewRunDialog } from '@/components/new-run-dialog'
 import { ObjectDialog } from '@/components/object-dialog'
 import { Page } from '@/components/page'
 import { RetentionDialog } from '@/components/retention-dialog'
@@ -60,6 +62,7 @@ export function GroupsPage() {
   const [objectTarget, setObjectTarget] = useState<ObjectTarget | undefined>()
   const [removingObject, setRemovingObject] = useState<ObjectTarget | undefined>()
   const [retentionTarget, setRetentionTarget] = useState<ObjectTarget | undefined>()
+  const [runGroup, setRunGroup] = useState<Group | undefined>()
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['groups'] })
 
@@ -143,6 +146,15 @@ export function GroupsPage() {
               <CardTitle>{group.name}</CardTitle>
               <CardDescription>{t('groups.objects', { count: group.objects.length })}</CardDescription>
               <CardAction className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  disabled={group.objects.length < 2}
+                  title={group.objects.length < 2 ? t('groups.newrun.needTwo') : undefined}
+                  onClick={() => setRunGroup(group)}
+                >
+                  <PlayIcon />
+                  {t('groups.newrun')}
+                </Button>
                 <Button size="sm" variant="outline" onClick={() => setObjectTarget({ group })}>
                   <PlusIcon />
                   {t('groups.object.add')}
@@ -286,6 +298,12 @@ export function GroupsPage() {
         groupId={objectTarget?.group.id ?? ''}
         devices={deviceList}
         object={objectTarget?.object}
+      />
+      <NewRunDialog
+        open={runGroup != null}
+        onOpenChange={(next) => !next && setRunGroup(undefined)}
+        group={runGroup}
+        devices={deviceList}
       />
       <RetentionDialog
         open={retentionTarget != null}

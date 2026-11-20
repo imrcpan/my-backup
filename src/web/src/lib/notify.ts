@@ -15,8 +15,15 @@ export function useNotify() {
     return error instanceof Error ? error.message : t('error.unexpected')
   }
 
+  /** The text for an error code that came inside a run, with the message of the server as the fallback. */
+  const describeCode = (code: string | undefined, message: string | undefined): string => {
+    const key = `error.${code}`
+    return code && has(key) ? t(key) : (message ?? t('error.unexpected'))
+  }
+
   return {
     describe,
+    describeCode,
     error: (error: unknown) => toast.error(describe(error)),
     success: (key: MessageKey) => toast.success(t(key)),
   }

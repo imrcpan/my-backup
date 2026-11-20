@@ -1,4 +1,5 @@
-import { HardDriveIcon, HistoryIcon, LayersIcon } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { HardDriveIcon, HistoryIcon, LayersIcon, Loader2Icon } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   Sidebar,
@@ -7,10 +8,12 @@ import {
   SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
 } from '@/components/ui/sidebar'
+import { api } from '@/lib/api'
 import { useI18n, type MessageKey } from '@/lib/i18n'
 
 const items: { to: string; label: MessageKey; icon: typeof LayersIcon }[] = [
@@ -22,6 +25,12 @@ const items: { to: string; label: MessageKey; icon: typeof LayersIcon }[] = [
 export function AppSidebar() {
   const { t } = useI18n()
   const { pathname } = useLocation()
+  const runs = useQuery({
+    queryKey: ['runs'],
+    queryFn: api.runs.list,
+    refetchInterval: (query) => (query.state.data?.some((run) => run.state === 'Running') ? 2000 : 15000),
+  })
+  const running = runs.data?.some((run) => run.state === 'Running') ?? false
 
   return (
     <Sidebar>
@@ -41,6 +50,11 @@ export function AppSidebar() {
                     <item.icon />
                     <span>{t(item.label)}</span>
                   </SidebarMenuButton>
+                  {item.to === '/runs' && running && (
+                    <SidebarMenuBadge title={t('nav.runs.active')}>
+                      <Loader2Icon className="size-3.5 animate-spin" />
+                    </SidebarMenuBadge>
+                  )}
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>

@@ -5,7 +5,8 @@ import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { useI18n } from '@/lib/i18n'
 import { DevicesPage } from '@/pages/DevicesPage'
 import { GroupsPage } from '@/pages/GroupsPage'
-import { Placeholder } from '@/pages/Placeholder'
+import { RunPage } from '@/pages/RunPage'
+import { RunsPage } from '@/pages/RunsPage'
 
 function NotFound() {
   const { t } = useI18n()
@@ -25,7 +26,8 @@ export default function App() {
           <Route path="/" element={<Navigate to="/groups" replace />} />
           <Route path="/groups" element={<GroupsPage />} />
           <Route path="/devices" element={<DevicesPage />} />
-          <Route path="/runs" element={<Placeholder title="page.runs.title" description="page.runs.description" />} />
+          <Route path="/runs" element={<RunsPage />} />
+          <Route path="/runs/:id" element={<RunPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </SidebarInset>
