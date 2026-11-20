@@ -147,8 +147,8 @@ public sealed class RunStep
 
     public string? ErrorMessage { get; set; }
 
-    /// <summary>Whether this step removes data that cannot be had back.</summary>
-    public bool Destructive => Kind is StepKind.Forget or StepKind.Prune || ToDelete > 0;
+    /// <summary>Whether this step removes data that cannot be had back. A step with nothing to do removes nothing.</summary>
+    public bool Destructive => State != StepState.UpToDate && (Kind is StepKind.Forget or StepKind.Prune || ToDelete > 0);
 }
 
 public sealed class Run
