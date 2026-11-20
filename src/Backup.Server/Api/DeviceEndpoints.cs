@@ -64,6 +64,19 @@ public static class DeviceEndpoints
             }
         });
 
+        // rclone opens a browser for the user to sign in to Google and waits, so this ends when they finish, or when the request is dropped.
+        api.MapPost("/{id}/authorize", async (string id, Workspace workspace, IRcloneClient rclone, CancellationToken cancellationToken) =>
+        {
+            StorageDevice device = Find(workspace, id);
+            if (device.Kind != StorageDeviceKind.Rclone)
+            {
+                throw new DomainException("device_not_cloud", "Only a cloud drive can be signed in to.");
+            }
+
+            await rclone.CreateGoogleDriveRemoteAsync(device.RcloneRemote!, null, cancellationToken);
+            return Results.NoContent();
+        });
+
         // The directories below a path of the device, for choosing where a storage object goes.
         api.MapGet("/{id}/directories", async (string id, string? path, Workspace workspace, IDeviceResolver resolver, IRcloneClient rclone, CancellationToken cancellationToken) =>
         {

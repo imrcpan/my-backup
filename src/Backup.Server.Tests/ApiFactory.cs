@@ -39,11 +39,18 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 
     public FakeDiskProbe Probe { get; }
 
+    /// <summary>Services that replace the real ones; set before the first request.</summary>
+    public Action<IServiceCollection>? Replace { get; set; }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("DataDir", Path.Combine(Root, "data"));
         builder.UseSetting("RcloneConfig", RcloneConfig);
-        builder.ConfigureServices(services => services.AddSingleton<IDiskProbe>(Probe));
+        builder.ConfigureServices(services =>
+        {
+            services.AddSingleton<IDiskProbe>(Probe);
+            Replace?.Invoke(services);
+        });
     }
 
     public async Task<(HttpStatusCode Status, JsonElement Body)> Send(string method, string url, string? json = null)
