@@ -5,14 +5,16 @@ namespace Backup.Server.Api;
 
 public sealed record ToolDto(bool Available, string? Version);
 
-public sealed record SystemDto(ToolDto Restic, ToolDto Rclone);
+/// <param name="Home">The home directory of the user, where a restore is offered to go by default.</param>
+public sealed record SystemDto(ToolDto Restic, ToolDto Rclone, string Home);
 
 public static class SystemEndpoints
 {
     public static void Map(WebApplication app) => app.MapGet("/api/system", async (IProcessRunner runner, IConfiguration configuration, CancellationToken cancellationToken) =>
         new SystemDto(
             await Probe(runner, configuration["ResticPath"] ?? "restic", cancellationToken),
-            await Probe(runner, configuration["RclonePath"] ?? "rclone", cancellationToken)));
+            await Probe(runner, configuration["RclonePath"] ?? "rclone", cancellationToken),
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));
 
     private static async Task<ToolDto> Probe(IProcessRunner runner, string program, CancellationToken cancellationToken)
     {

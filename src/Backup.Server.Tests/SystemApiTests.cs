@@ -17,5 +17,6 @@ public sealed class SystemApiTests : IDisposable
         Assert.StartsWith("restic", system.GetProperty("restic").GetProperty("version").GetString());
         Assert.True(system.GetProperty("rclone").GetProperty("available").GetBoolean());
         Assert.StartsWith("rclone", system.GetProperty("rclone").GetProperty("version").GetString());
+        Assert.StartsWith("/", system.GetProperty("home").GetString());
     }
 }
