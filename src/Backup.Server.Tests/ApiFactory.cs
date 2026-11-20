@@ -61,6 +61,23 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         return (response.StatusCode, body);
     }
 
+    /// <summary>Waits until the run is over and returns it.</summary>
+    public async Task<JsonElement> WaitForRun(string id)
+    {
+        for (int i = 0; i < 600; i++)
+        {
+            (_, JsonElement run) = await Send("GET", $"/api/runs/{id}");
+            if (run.GetProperty("state").GetString() != "Running")
+            {
+                return run;
+            }
+
+            await Task.Delay(100, TestContext.Current.CancellationToken);
+        }
+
+        throw new TimeoutException("The run did not end.");
+    }
+
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
