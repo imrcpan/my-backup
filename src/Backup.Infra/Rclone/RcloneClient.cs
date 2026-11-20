@@ -26,6 +26,19 @@ public sealed record RcloneEntry(string Name, bool IsDir);
 
 internal sealed record RcloneJsonEntry(string Name, bool IsDir);
 
+/// <param name="Action">"copy" or "delete".</param>
+public sealed record RcloneSyncItem(string Action, string Path, long Size);
+
+/// <summary>What a sync would do to the target. Nothing is changed by making this.</summary>
+public sealed record RcloneSyncPlan(
+    long CopyCount,
+    long DeleteCount,
+    long BytesToCopy,
+    IReadOnlyList<RcloneSyncItem> Items,
+    bool ItemsTruncated);
+
+public sealed record RcloneSyncProgress(long Bytes, long TotalBytes, long Transfers, long TotalTransfers);
+
 [JsonSourceGenerationOptions(PropertyNameCaseInsensitive = true)]
 [JsonSerializable(typeof(RcloneJsonEntry[]))]
 internal sealed partial class RcloneJson : JsonSerializerContext;
@@ -44,6 +57,18 @@ public interface IRcloneClient
     /// and waits, so this ends when the user finishes or when it is cancelled.
     /// </summary>
     Task CreateGoogleDriveRemoteAsync(string remote, Action<string>? onLine = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Finds what making <paramref name="target"/> look like <paramref name="source"/> would copy and delete.
+    /// Both are a directory or "remote:/path".
+    /// </summary>
+    Task<RcloneSyncPlan> PlanSyncAsync(string source, string target, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Makes the target look like the source. It stops before it deletes more than
+    /// <paramref name="maxDeletes"/> files, which is what the user was shown and confirmed.
+    /// </summary>
+    Task SyncAsync(string source, string target, long maxDeletes, Action<RcloneSyncProgress>? onProgress = null, CancellationToken cancellationToken = default);
 }
 
 public sealed partial class RcloneClient(IProcessRunner runner, RcloneOptions? options = null) : IRcloneClient
@@ -92,7 +117,116 @@ public sealed partial class RcloneClient(IProcessRunner runner, RcloneOptions? o
         Ensure(result);
     }
 
-    private Task<ProcessResult> RunAsync(IReadOnlyList<string> arguments, Action<string>? onLine, CancellationToken cancellationToken)
+    public const int MaxPlanItems = 500;
+
+    public async Task<RcloneSyncPlan> PlanSyncAsync(string source, string target, CancellationToken cancellationToken = default)
+    {
+        ValidateLocation(source);
+        ValidateLocation(target);
+        List<RcloneSyncItem> items = [];
+        long copies = 0, deletes = 0, bytes = 0;
+        ProcessResult result = await RunAsync(
+            ["sync", "--dry-run", "--use-json-log", "-v", "--stats", "0", "--", source, target],
+            null,
+            cancellationToken,
+            line =>
+            {
+                if (ParseSkipped(line) is not (string action, string path, long size) || action is not ("copy" or "delete"))
+                {
+                    return;
+                }
+
+                if (action == "copy")
+                {
+                    copies++;
+                    bytes += size;
+                }
+                else
+                {
+                    deletes++;
+                }
+
+                if (items.Count < MaxPlanItems)
+                {
+                    items.Add(new RcloneSyncItem(action, path, size));
+                }
+            });
+        Ensure(result);
+        return new RcloneSyncPlan(copies, deletes, bytes, items, copies + deletes > items.Count);
+    }
+
+    public async Task SyncAsync(string source, string target, long maxDeletes, Action<RcloneSyncProgress>? onProgress = null, CancellationToken cancellationToken = default)
+    {
+        ValidateLocation(source);
+        ValidateLocation(target);
+        ArgumentOutOfRangeException.ThrowIfNegative(maxDeletes);
+        ProcessResult result = await RunAsync(
+            [
+                "sync", "--use-json-log", "--stats", "1s", "--stats-log-level", "NOTICE",
+                "--max-delete", maxDeletes.ToString(System.Globalization.CultureInfo.InvariantCulture), "--", source, target,
+            ],
+            null,
+            cancellationToken,
+            line =>
+            {
+                if (ParseStats(line) is RcloneSyncProgress progress)
+                {
+                    onProgress?.Invoke(progress);
+                }
+            });
+        Ensure(result);
+    }
+
+    private static (string Action, string Path, long Size)? ParseSkipped(string line)
+    {
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(line);
+            JsonElement root = document.RootElement;
+            if (root.TryGetProperty("skipped", out JsonElement action) && root.TryGetProperty("object", out JsonElement path))
+            {
+                long size = root.TryGetProperty("size", out JsonElement s) && s.ValueKind == JsonValueKind.Number ? s.GetInt64() : 0;
+                return (action.GetString() ?? "", path.GetString() ?? "", size);
+            }
+        }
+        catch (JsonException)
+        {
+        }
+
+        return null;
+    }
+
+    private static RcloneSyncProgress? ParseStats(string line)
+    {
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(line);
+            if (document.RootElement.TryGetProperty("stats", out JsonElement stats))
+            {
+                static long Get(JsonElement e, string name) => e.TryGetProperty(name, out JsonElement v) && v.ValueKind == JsonValueKind.Number ? v.GetInt64() : 0;
+                return new RcloneSyncProgress(Get(stats, "bytes"), Get(stats, "totalBytes"), Get(stats, "transfers"), Get(stats, "totalTransfers"));
+            }
+        }
+        catch (JsonException)
+        {
+        }
+
+        return null;
+    }
+
+    [GeneratedRegex("^(/|[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}:/)")]
+    private static partial Regex LocationPattern();
+
+    /// <summary>A directory or "remote:/path"; never something that could be read as an option.</summary>
+    private static void ValidateLocation(string location)
+    {
+        if (!LocationPattern().IsMatch(location))
+        {
+            throw new ExternalToolException("location_invalid", "A location must be an absolute path or remote:/path.");
+        }
+    }
+
+    private Task<ProcessResult> RunAsync(IReadOnlyList<string> arguments, Action<string>? onLine, CancellationToken cancellationToken, Action<string>? onErrorLine = null)
     {
         List<string> all = [];
         if (_options.ConfigFile != null)
@@ -102,7 +236,7 @@ public sealed partial class RcloneClient(IProcessRunner runner, RcloneOptions? o
         }
 
         all.AddRange(arguments);
-        return runner.RunAsync(new ProcessSpec(_options.ExecutablePath, all), onLine, null, cancellationToken);
+        return runner.RunAsync(new ProcessSpec(_options.ExecutablePath, all), onLine, onErrorLine, cancellationToken);
     }
 
     private static void ValidateRemote(string remote)

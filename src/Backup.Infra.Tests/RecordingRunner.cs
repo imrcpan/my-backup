@@ -20,6 +20,11 @@ public sealed class RecordingRunner : IProcessRunner
             onStandardOutputLine?.Invoke(line);
         }
 
+        foreach (string line in result.StandardError.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            onStandardErrorLine?.Invoke(line);
+        }
+
         return Task.FromResult(result);
     }
 }
