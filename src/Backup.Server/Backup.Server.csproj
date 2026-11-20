@@ -25,9 +25,4 @@
         <ProjectReference Include="../Backup.App/Backup.App.csproj" />
     </ItemGroup>
 
-    <ItemGroup>
-        <!-- The built web interface, copied here by the web build; it is not committed. -->
-        <Content Include="wwwroot/**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('wwwroot')" />
-    </ItemGroup>
-
 </Project>
