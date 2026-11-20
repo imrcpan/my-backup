@@ -13,6 +13,8 @@ type I18nContextValue = {
   setLocale: (locale: Locale) => void
   /** The text for a key; {name} in the text is replaced by params.name. */
   t: (key: MessageKey, params?: Record<string, string | number>) => string
+  /** Whether there is a text for this key, for the keys that are made from data, such as error codes. */
+  has: (key: string) => key is MessageKey
 }
 
 const I18nContext = createContext<I18nContextValue | undefined>(undefined)
@@ -48,7 +50,9 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
       params && name in params ? String(params[name]) : whole,
     )
 
-  return <I18nContext.Provider value={{ locale, setLocale, t }}>{children}</I18nContext.Provider>
+  const has = (key: string): key is MessageKey => key in dictionaries[locale]
+
+  return <I18nContext.Provider value={{ locale, setLocale, t, has }}>{children}</I18nContext.Provider>
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

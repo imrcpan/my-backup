@@ -3,6 +3,7 @@ import { AppSidebar } from '@/components/app-sidebar'
 import { Page } from '@/components/page'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { useI18n } from '@/lib/i18n'
+import { DevicesPage } from '@/pages/DevicesPage'
 import { Placeholder } from '@/pages/Placeholder'
 
 function NotFound() {
@@ -25,10 +26,7 @@ export default function App() {
             path="/groups"
             element={<Placeholder title="page.groups.title" description="page.groups.description" />}
           />
-          <Route
-            path="/devices"
-            element={<Placeholder title="page.devices.title" description="page.devices.description" />}
-          />
+          <Route path="/devices" element={<DevicesPage />} />
           <Route path="/runs" element={<Placeholder title="page.runs.title" description="page.runs.description" />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
