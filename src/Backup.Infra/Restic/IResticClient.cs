@@ -1,3 +1,5 @@
+using Backup.Core;
+
 namespace Backup.Infra.Restic;
 
 public interface IResticClient
@@ -33,4 +35,18 @@ public interface IResticClient
         IReadOnlyList<string>? paths = null,
         Action<ResticRestoreProgress>? onProgress = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Finds which snapshots a policy would remove. Nothing is removed.</summary>
+    Task<ResticForgetPlan> PlanForgetAsync(ResticRepository repository, RetentionPolicy policy, CancellationToken cancellationToken = default);
+
+    /// <summary>Removes the snapshots that the policy does not keep. Their data stays until <see cref="PruneAsync"/>.</summary>
+    Task<ResticForgetPlan> ForgetAsync(ResticRepository repository, RetentionPolicy policy, CancellationToken cancellationToken = default);
+
+    /// <summary>Finds which of the given snapshots exist, to be removed by <see cref="ForgetSnapshotsAsync"/>.</summary>
+    Task<ResticForgetPlan> PlanForgetSnapshotsAsync(ResticRepository repository, IReadOnlyList<string> snapshotIds, CancellationToken cancellationToken = default);
+
+    Task ForgetSnapshotsAsync(ResticRepository repository, IReadOnlyList<string> snapshotIds, CancellationToken cancellationToken = default);
+
+    /// <summary>Deletes the data that no snapshot uses any more. This frees space and cannot be undone.</summary>
+    Task PruneAsync(ResticRepository repository, Action<string>? onLine = null, CancellationToken cancellationToken = default);
 }

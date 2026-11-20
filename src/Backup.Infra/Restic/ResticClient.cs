@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using Backup.Core;
 using Backup.Infra.Logging;
 using Backup.Infra.Process;
 
@@ -8,7 +10,7 @@ namespace Backup.Infra.Restic;
 /// Runs restic. The repository location goes in the arguments, the password only in
 /// the environment of the child process, so it is never on a command line.
 /// </summary>
-public sealed class ResticClient(IProcessRunner runner, ResticOptions? options = null) : IResticClient
+public sealed partial class ResticClient(IProcessRunner runner, ResticOptions? options = null) : IResticClient
 {
     private readonly ResticOptions _options = options ?? new ResticOptions();
 
@@ -66,6 +68,87 @@ public sealed class ResticClient(IProcessRunner runner, ResticOptions? options =
     }
 
     public const int MaxPlanItems = 500;
+
+    public Task<ResticForgetPlan> PlanForgetAsync(ResticRepository repository, RetentionPolicy policy, CancellationToken cancellationToken = default) =>
+        ForgetByPolicyAsync(repository, policy, dryRun: true, cancellationToken);
+
+    public Task<ResticForgetPlan> ForgetAsync(ResticRepository repository, RetentionPolicy policy, CancellationToken cancellationToken = default) =>
+        ForgetByPolicyAsync(repository, policy, dryRun: false, cancellationToken);
+
+    private async Task<ResticForgetPlan> ForgetByPolicyAsync(ResticRepository repository, RetentionPolicy policy, bool dryRun, CancellationToken cancellationToken)
+    {
+        RetentionPolicy valid = policy.Validated();
+        List<string> arguments = ["forget", "--json"];
+        if (dryRun)
+        {
+            arguments.Add("--dry-run");
+        }
+
+        void Keep(string flag, int count)
+        {
+            if (count > 0)
+            {
+                arguments.Add(flag);
+                arguments.Add(count.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            }
+        }
+
+        Keep("--keep-last", valid.KeepLast);
+        Keep("--keep-daily", valid.KeepDaily);
+        Keep("--keep-weekly", valid.KeepWeekly);
+        Keep("--keep-monthly", valid.KeepMonthly);
+        Keep("--keep-yearly", valid.KeepYearly);
+
+        ProcessResult result = await RunRawAsync(repository, arguments, null, cancellationToken);
+        Ensure(repository, result);
+        ResticForgetGroup[] groups = JsonSerializer.Deserialize(result.StandardOutput, ResticForgetJson.Default.ResticForgetGroupArray) ?? [];
+        return new ResticForgetPlan(
+            [.. groups.SelectMany(g => g.Keep ?? []).OrderBy(s => s.Time)],
+            [.. groups.SelectMany(g => g.Remove ?? []).OrderBy(s => s.Time)]);
+    }
+
+    public async Task<ResticForgetPlan> PlanForgetSnapshotsAsync(ResticRepository repository, IReadOnlyList<string> snapshotIds, CancellationToken cancellationToken = default)
+    {
+        ValidateSnapshotIds(snapshotIds);
+        IReadOnlyList<ResticSnapshot> all = await SnapshotsAsync(repository, cancellationToken);
+        List<ResticSnapshot> remove = [];
+        foreach (string id in snapshotIds)
+        {
+            ResticSnapshot[] found = [.. all.Where(s => s.Id.StartsWith(id, StringComparison.OrdinalIgnoreCase))];
+            if (found.Length != 1)
+            {
+                throw new ExternalToolException(found.Length == 0 ? "snapshot_not_found" : "snapshot_ambiguous", $"Snapshot {id} was not found exactly once.");
+            }
+
+            if (!remove.Contains(found[0]))
+            {
+                remove.Add(found[0]);
+            }
+        }
+
+        return new ResticForgetPlan([.. all.Except(remove)], remove);
+    }
+
+    public async Task ForgetSnapshotsAsync(ResticRepository repository, IReadOnlyList<string> snapshotIds, CancellationToken cancellationToken = default)
+    {
+        // Resolved first, so that an id that matches nothing or many removes nothing at all.
+        ResticForgetPlan plan = await PlanForgetSnapshotsAsync(repository, snapshotIds, cancellationToken);
+        Ensure(repository, await RunRawAsync(repository, ["forget", "--", .. plan.Remove.Select(s => s.Id)], null, cancellationToken));
+    }
+
+    public async Task PruneAsync(ResticRepository repository, Action<string>? onLine = null, CancellationToken cancellationToken = default) =>
+        Ensure(repository, await RunRawAsync(repository, ["prune"], onLine, cancellationToken, captureOutput: false));
+
+    [GeneratedRegex("^[0-9a-fA-F]{8,64}$")]
+    private static partial Regex SnapshotIdPattern();
+
+    private static void ValidateSnapshotIds(IReadOnlyList<string> ids)
+    {
+        if (ids.Count == 0 || ids.Any(id => !SnapshotIdPattern().IsMatch(id)))
+        {
+            throw new ExternalToolException("snapshot_id_invalid", "Snapshot ids must be 8 to 64 hexadecimal characters.");
+        }
+    }
 
     public async Task<ResticBackupPlan> PlanBackupAsync(ResticRepository repository, string sourceDirectory, CancellationToken cancellationToken = default)
     {
