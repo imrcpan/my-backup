@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en" class="dark" style="color-scheme: dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark light" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Backup Manager</title>
+    <script>
+      // Runs before the first paint: sets the theme from the saved choice (dark when there is none),
+      // so that the page never flashes white while the interface loads.
+      ;(function () {
+        var theme = 'dark'
+        try {
+          theme = localStorage.getItem('backup-theme') || 'dark'
+        } catch (e) {}
+        var dark = theme === 'dark' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
+        var root = document.documentElement
+        root.classList.toggle('dark', dark)
+        root.style.colorScheme = dark ? 'dark' : 'light'
+        root.style.backgroundColor = dark ? '#0a0a0a' : '#ffffff'
+        try {
+          var lang = localStorage.getItem('backup-language')
+          root.lang = lang === 'zh' || (!lang && navigator.language.indexOf('zh') === 0) ? 'zh' : 'en'
+        } catch (e) {}
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
