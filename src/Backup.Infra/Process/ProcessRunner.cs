@@ -6,14 +6,16 @@ using System.Text;
 namespace Backup.Infra.Process;
 
 /// <param name="gracePeriod">
-/// How long a program that is asked to stop (with SIGINT, as Ctrl+C does) may take to finish by itself,
-/// before it and its children are killed. restic and rclone use it to release their locks and to remove
-/// the files they have only half written; a kill leaves those behind.
+/// How long a program that is asked to stop may take to finish by itself, before it and its children are killed.
+/// It is asked with SIGINT, as Ctrl+C does, and after a quarter of the time with SIGTERM, for the case that SIGINT is ignored
+/// (a program that was started in the background by a shell inherits that). restic and rclone use the request to release
+/// their locks and to remove the files they have only half written; a kill leaves those behind.
 /// </param>
 public sealed partial class ProcessRunner(TimeSpan? gracePeriod = null) : IProcessRunner
 {
     private const int MaxErrorCharacters = 32 * 1024;
     private const int SigInt = 2;
+    private const int SigTerm = 15;
     private readonly TimeSpan _gracePeriod = gracePeriod ?? TimeSpan.FromSeconds(20);
 
     [LibraryImport("libc", EntryPoint = "kill", SetLastError = true)]
@@ -148,12 +150,23 @@ public sealed partial class ProcessRunner(TimeSpan? gracePeriod = null) : IProce
         {
             try
             {
-                await Task.Delay(_gracePeriod, ended);
+                await Task.Delay(_gracePeriod / 4, ended);
+                if (SendSignal(process.Id, SigTerm) != 0)
+                {
+                    Kill(process);
+                    return;
+                }
+
+                await Task.Delay(_gracePeriod - (_gracePeriod / 4), ended);
                 Kill(process);
             }
             catch (OperationCanceledException)
             {
                 // It ended by itself.
+            }
+            catch (InvalidOperationException)
+            {
+                // Already finished.
             }
         }, CancellationToken.None);
     }

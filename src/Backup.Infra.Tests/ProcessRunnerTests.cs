@@ -88,9 +88,16 @@ public class ProcessRunnerTests
             () => _runner.RunAsync(new("sleep", ["60"]), cancellationToken: cancel.Token));
     }
 
+    /// <summary>A program that was started in the background by a shell has SIGINT ignored, and so have its children.</summary>
+    private static bool SigIntIsIgnored() =>
+        File.ReadLines("/proc/self/status").FirstOrDefault(l => l.StartsWith("SigIgn:", StringComparison.Ordinal)) is string line
+        && (Convert.ToUInt64(line["SigIgn:".Length..].Trim(), 16) & (1UL << 1)) != 0;
+
     [Fact]
     public async Task Cancel_first_asks_the_program_to_stop_so_that_it_can_clean_up()
     {
+        Assert.SkipWhen(SigIntIsIgnored(), "SIGINT is ignored in this process, as when the tests are started in the background.");
+
         // A program that cleans up when it is interrupted, as restic and rclone do.
         List<string> lines = [];
         using CancellationTokenSource cancel = new();
@@ -112,12 +119,12 @@ public class ProcessRunnerTests
     }
 
     [Fact]
-    public async Task A_program_that_ignores_the_request_is_killed_after_the_grace_period()
+    public async Task A_program_that_ignores_every_request_is_killed_after_the_grace_period()
     {
         ProcessRunner patient = new(TimeSpan.FromMilliseconds(400));
         using CancellationTokenSource cancel = new();
         Task<ProcessResult> run = patient.RunAsync(
-            new("sh", ["-c", "trap '' INT; echo ready; sleep 60"]),
+            new("sh", ["-c", "trap '' INT TERM; echo ready; sleep 60"]),
             line =>
             {
                 if (line == "ready")
@@ -132,5 +139,29 @@ public class ProcessRunnerTests
 
         TimeSpan took = DateTime.UtcNow - start;
         Assert.InRange(took, TimeSpan.FromMilliseconds(300), TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public async Task A_program_that_ignores_SIGINT_is_asked_again_with_SIGTERM_before_it_is_killed()
+    {
+        // Only SIGINT is ignored, as in a program that a shell started in the background. SIGTERM, after a quarter of the grace period, ends it long before the kill.
+        ProcessRunner patient = new(TimeSpan.FromSeconds(20));
+        using CancellationTokenSource cancel = new();
+        Task<ProcessResult> run = patient.RunAsync(
+            new("sh", ["-c", "trap '' INT; echo ready; while true; do sleep 0.1; done"]),
+            line =>
+            {
+                if (line == "ready")
+                {
+                    cancel.Cancel();
+                }
+            },
+            cancellationToken: cancel.Token);
+
+        DateTime start = DateTime.UtcNow;
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
+
+        TimeSpan took = DateTime.UtcNow - start;
+        Assert.InRange(took, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(10));
     }
 }
