@@ -127,6 +127,18 @@ cd .. && dotnet publish Backup.Server -c Release -r linux-x64 -o out
 AOT-compatible in every configuration: the analyzers report any reflection,
 and JSON, request handling and configuration use source generators.
 
+## Releases
+
+The workflow `Publish` (GitHub Actions, started by hand with a version such as `1.0`) publishes the
+program with Native AOT for Linux and makes a release with an archive for each architecture:
+`my_backup_linux_<version>_x64.tar.gz` and `my_backup_linux_<version>_arm64.tar.gz`. An archive holds the
+folder `my-backup/` with the program, the interface (`wwwroot`), this README and `my-backup.service`:
+
+```sh
+sudo tar -xzf my_backup_linux_1.0_x64.tar.gz -C /opt      # makes /opt/my-backup
+/opt/my-backup/backup-manager                             # http://localhost:1580
+```
+
 ## Run it as a service (systemd)
 
 `my-backup.service` can be copied as it is. It runs the published program from `/opt/my-backup` on
@@ -135,6 +147,7 @@ port 1582 as the user `prc`; change `User=`, `Group=` and the paths in it if you
 ```sh
 cd src/web && pnpm build && cd ..
 sudo dotnet publish Backup.Server -c Release -r linux-x64 -o /opt/my-backup   # the interface is read from ./wwwroot there
+# (or unpack a release into /opt, see above)
 sudo cp ../my-backup.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now my-backup          # then open http://localhost:1582

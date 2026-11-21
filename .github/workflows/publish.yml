@@ -1,0 +1,163 @@
+name: Publish
+
+# Started by hand only. It asks for a version such as 1.0 or 1.1, builds the web interface and
+# publishes the program with Native AOT (dotnet publish -c Release) for Linux x64 and arm64, and
+# makes a GitHub release with one archive per architecture:
+#
+#   my_backup_linux_<version>_x64.tar.gz
+#   my_backup_linux_<version>_arm64.tar.gz
+#
+# Everything runs on ubuntu-latest, which is x64. The arm64 program is cross-compiled there; no arm runner is used.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version, for example 1.0 or 1.1 (the tag will be v1.0)"
+        required: true
+        type: string
+      dry_run:
+        description: "Build and keep the archives as workflow artifacts, but make no release"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check the version
+    runs-on: ubuntu-latest
+    steps:
+      - name: The version is numbers and dots, and has no release yet
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){1,2}$ ]]; then
+            echo "::error::The version must be like 1.0, 1.1 or 1.0.1, not '$VERSION'."
+            exit 1
+          fi
+          if gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::The release v$VERSION exists already."
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags "https://github.com/$GITHUB_REPOSITORY" "refs/tags/v$VERSION" >/dev/null 2>&1; then
+            echo "::error::The tag v$VERSION exists already."
+            exit 1
+          fi
+
+  build:
+    name: Build ${{ matrix.arch }}
+    needs: check
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            rid: linux-x64
+          - arch: arm64
+            rid: linux-arm64
+    env:
+      VERSION: ${{ inputs.version }}
+      ARCH: ${{ matrix.arch }}
+      RID: ${{ matrix.rid }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          package_json_file: src/web/package.json
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 11.0.x
+          # The project is on .NET 11 while it is in preview or release candidate. Change this when it is released.
+          dotnet-quality: preview
+
+      # Native AOT for arm64 on an x64 machine needs the arm64 linker libraries and the arm64 binutils.
+      - name: Tools to cross-compile for arm64
+        if: matrix.arch == 'arm64'
+        run: |
+          sudo dpkg --add-architecture arm64
+          # The packages of the machine come from the usual mirror for amd64 only; those of arm64 come from ports.ubuntu.com.
+          sudo sed -i '/^Types: deb$/a Architectures: amd64' /etc/apt/sources.list.d/ubuntu.sources
+          sudo tee /etc/apt/sources.list.d/ubuntu-arm64.sources >/dev/null <<'EOF'
+          Types: deb
+          URIs: http://ports.ubuntu.com/ubuntu-ports
+          Suites: noble noble-updates noble-security
+          Components: main universe
+          Architectures: arm64
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+          EOF
+          sudo apt-get update
+          sudo apt-get install -y clang llvm binutils-aarch64-linux-gnu gcc-aarch64-linux-gnu zlib1g-dev:arm64
+
+      - name: Build the web interface
+        working-directory: src/web
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build   # writes into src/Backup.Server/wwwroot
+
+      - name: Publish with Native AOT
+        run: |
+          extra=()
+          if [ "$ARCH" = "arm64" ]; then
+            extra=(-p:CppCompilerAndLinker=clang -p:SysRoot=/ -p:ObjCopyName=aarch64-linux-gnu-objcopy)
+          fi
+          dotnet publish src/Backup.Server -c Release -r "$RID" -p:Version="$VERSION" "${extra[@]}" -o publish
+
+      - name: Make the archive
+        run: |
+          name="my_backup_linux_${VERSION}_${ARCH}"
+          rm -f publish/*.dbg publish/*.pdb
+          mkdir -p stage/my-backup
+          cp -r publish/. stage/my-backup/
+          cp README.md my-backup.service stage/my-backup/
+          # my-backup/ is what is unpacked into /opt, where my-backup.service expects the program.
+          tar -czf "${name}.tar.gz" -C stage my-backup
+          ls -l "${name}.tar.gz"
+          tar -tzf "${name}.tar.gz" | head -20
+          file stage/my-backup/backup-manager
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: my_backup_linux_${{ inputs.version }}_${{ matrix.arch }}
+          path: my_backup_linux_${{ inputs.version }}_${{ matrix.arch }}.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Make the release
+    needs: build
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: archives
+          merge-multiple: true
+
+      - name: Create the release v${{ inputs.version }}
+        run: |
+          ls -l archives
+          gh release create "v$VERSION" archives/my_backup_linux_"$VERSION"_*.tar.gz \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "$VERSION" \
+            --generate-notes
