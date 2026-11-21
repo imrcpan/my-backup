@@ -43,7 +43,8 @@ public sealed class FakeRestic : IResticClient
     public Task<bool> ExistsAsync(ResticRepository repository, CancellationToken cancellationToken = default) => Task.FromResult(true);
 
     public Task<ResticBackupPlan> PlanBackupAsync(ResticRepository repository, string sourceDirectory, CancellationToken cancellationToken = default) =>
-        Task.FromResult(new ResticBackupPlan(1, 0, 0, 5, 5, [new ResticPlanItem("new", sourceDirectory + "/a.txt", 5)], false));
+        Task.FromResult(new ResticBackupPlan(
+            1, 0, 0, 5, 5, [new ResticPlanItem("new", sourceDirectory + "/a.txt", 5)], false, [new ResticPlanItem("new", sourceDirectory + "/a.txt", 5)], false));
 
     public Task<ResticBackupSummary> BackupAsync(ResticRepository repository, string sourceDirectory, Action<ResticBackupProgress>? onProgress = null, CancellationToken cancellationToken = default)
     {

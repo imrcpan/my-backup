@@ -61,6 +61,7 @@ public sealed partial class RunPlanner
             step.ToChange = plan.FilesChanged;
             step.Bytes = plan.BytesToUpload;
             AddLines(step, plan.Items.Select(i => new PlanLine { Action = i.Action, Path = i.Path, Size = i.Size }), plan.ItemsTruncated);
+            KeepWholeDiff(step, plan.AllItems.Select(i => new PlanLine { Action = i.Action, Path = i.Path, Size = i.Size }));
             if (plan.FilesNew + plan.FilesChanged == 0)
             {
                 step.State = StepState.UpToDate;
@@ -81,6 +82,7 @@ public sealed partial class RunPlanner
         step.ToAdd = scan.Files;
         step.Bytes = scan.Bytes;
         AddLines(step, scan.First.Select(f => new PlanLine { Action = "new", Path = f.Path, Size = f.Size }), scan.Truncated);
+        KeepWholeDiff(step, scan.All.Select(f => new PlanLine { Action = "new", Path = f.Path, Size = f.Size }));
     }
 
     private async Task PlanResticCopyAsync(Snapshot snapshot, StorageObject source, StorageObject target, RunStep step, CancellationToken cancellationToken)
@@ -129,7 +131,9 @@ public sealed partial class RunPlanner
         step.ToAdd = plan.CopyCount;
         step.ToDelete = plan.DeleteCount;
         step.Bytes = plan.BytesToCopy;
+        step.BytesToDelete = plan.BytesToDelete;
         AddLines(step, plan.Items.Select(i => new PlanLine { Action = i.Action, Path = i.Path, Size = i.Size }), plan.ItemsTruncated);
+        KeepWholeDiff(step, plan.AllItems.Select(i => new PlanLine { Action = i.Action, Path = i.Path, Size = i.Size }));
         if (plan.DeleteCount > 0)
         {
             step.Notes.Add("deletes_in_target");

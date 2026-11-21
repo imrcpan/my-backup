@@ -3,6 +3,7 @@ using Backup.App.Planning;
 using Backup.Core;
 using Backup.Core.Runs;
 using Backup.Infra.Logging;
+using Backup.Infra.Persistence;
 using Backup.Infra.Restic;
 using Backup.Infra.Storage;
 
@@ -36,7 +37,8 @@ public sealed class RunServiceFixture : IDisposable
         Runs = new RunCatalog(Store, Time.Now);
         IResticClient client = restic ?? Planner.Restic;
         PlanMaker = new RunPlanner(Planner.Workspace, new DeviceResolver(Planner.Probe), client, Planner.Rclone, Time);
-        Service = new RunService(Planner.Workspace, Runs, new DeviceResolver(Planner.Probe), client, Planner.Rclone, Log, Time);
+        Diffs = new PlanDiffStore(Path.Combine(Planner.Root, "plans"));
+        Service = new RunService(Planner.Workspace, Runs, new DeviceResolver(Planner.Probe), client, Planner.Rclone, Log, Diffs, Time);
     }
 
     public PlannerFixture Planner { get; }
@@ -44,6 +46,8 @@ public sealed class RunServiceFixture : IDisposable
     public SettableTime Time { get; }
 
     public RunLog Log { get; }
+
+    public PlanDiffStore Diffs { get; }
 
     public MemoryRunStore Store { get; }
 

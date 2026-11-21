@@ -64,6 +64,14 @@ public sealed class RunCatalog
         }
     }
 
+    public IReadOnlyCollection<string> Ids()
+    {
+        lock (_gate)
+        {
+            return [.. _runs.Select(r => r.Id)];
+        }
+    }
+
     /// <summary>A copy of the run; changes to it are not changes to the run (use <see cref="Update"/>).</summary>
     public Run? Find(string id)
     {

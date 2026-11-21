@@ -56,6 +56,7 @@ public static class AppSetup
             new JsonRunStore(Path.Combine(DataDirectory(sp.GetRequiredService<IConfiguration>()), "runs.json")),
             sp.GetRequiredService<TimeProvider>().GetUtcNow()));
         services.AddSingleton<IRunLog>(sp => new RunLog(Path.Combine(DataDirectory(sp.GetRequiredService<IConfiguration>()), "logs")));
+        services.AddSingleton<IPlanDiffStore>(sp => new PlanDiffStore(Path.Combine(DataDirectory(sp.GetRequiredService<IConfiguration>()), "plans")));
         services.AddSingleton<RunPlanner>();
         services.AddSingleton<RunService>();
         services.AddSingleton<RepositoryReader>();

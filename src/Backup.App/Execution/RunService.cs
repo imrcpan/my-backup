@@ -3,6 +3,7 @@ using Backup.Core;
 using Backup.Core.Runs;
 using Backup.Infra;
 using Backup.Infra.Logging;
+using Backup.Infra.Persistence;
 using Backup.Infra.Rclone;
 using Backup.Infra.Restic;
 using Backup.Infra.Storage;
@@ -21,6 +22,7 @@ public sealed partial class RunService(
     IResticClient restic,
     IRcloneClient rclone,
     IRunLog log,
+    IPlanDiffStore diffs,
     TimeProvider time)
 {
     private readonly object _gate = new();
@@ -32,9 +34,35 @@ public sealed partial class RunService(
     /// <param name="CreatedRoot">The highest folder that did not exist before the restore; null if the target existed.</param>
     private sealed record RestoreOutput(string Target, string? CreatedRoot);
 
+    /// <summary>
+    /// Keeps a plan until the user starts it or lets it go. The whole list of what each step does, which the planner has
+    /// handed over, is written to a file for the user to download; the plan itself carries only the start of it.
+    /// </summary>
     public Run Register(Run plan)
     {
+        foreach (RunStep step in plan.Steps.Where(s => s.CompleteDiff is { Count: > 0 }))
+        {
+            try
+            {
+                string header = $"Run {plan.Id} ({plan.Kind}) of the group '{plan.GroupName}', planned {plan.CreatedAt:yyyy-MM-dd HH:mm:ss}Z\n"
+                    + $"Step {step.Kind} on the storage object {step.TargetObjectId}\n"
+                    + $"{step.ToAdd} to add or copy ({step.Bytes} bytes), {step.ToChange} changed, {step.ToDelete} to delete ({step.BytesToDelete} bytes)";
+                diffs.Write(plan.Id, step.Id, header, step.CompleteDiff!);
+                step.HasDiff = true;
+            }
+            catch (IOException)
+            {
+                // The diff can still be read on the screen, as far as it goes; the plan does not fail for want of a copy of it.
+                step.HasDiff = false;
+            }
+            finally
+            {
+                step.CompleteDiff = null;
+            }
+        }
+
         runs.Add(plan);
+        diffs.Keep(runs.Ids());
         return runs.Find(plan.Id)!;
     }
 

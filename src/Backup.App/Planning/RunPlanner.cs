@@ -113,6 +113,9 @@ public sealed partial class RunPlanner(
         step.LinesTruncated = truncated;
     }
 
+    /// <summary>Hands over the whole list; the service that registers the plan writes it to a file for the user to download.</summary>
+    private static void KeepWholeDiff(RunStep step, IEnumerable<PlanLine> all) => step.CompleteDiff = [.. all];
+
     private static bool Inside(string path, string parent)
     {
         string p = Path.GetFullPath(path).TrimEnd('/') + "/";

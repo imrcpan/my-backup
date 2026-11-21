@@ -72,6 +72,7 @@ public sealed partial class RunPlanner
             {
                 step.ToAdd = chosenPaths.Count;
                 AddLines(step, chosenPaths.Take(MaxLines).Select(p => new PlanLine { Action = "restore", Path = p }), chosenPaths.Count > MaxLines);
+                KeepWholeDiff(step, chosenPaths.Select(p => new PlanLine { Action = "restore", Path = p }));
             }
         }));
         return run;
@@ -148,6 +149,7 @@ public sealed partial class RunPlanner
                 .. plan.Keep.Select(s => new PlanLine { Action = "keep", Path = $"{s.ShortId} ({s.Time:yyyy-MM-dd HH:mm})", Size = s.Summary?.TotalBytesProcessed ?? 0 }),
             ];
             AddLines(step, lines.Take(MaxLines), lines.Count > MaxLines);
+            KeepWholeDiff(step, lines);
             if (plan.Remove.Count == 0)
             {
                 step.State = StepState.UpToDate;
