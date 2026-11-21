@@ -107,6 +107,19 @@ public sealed class StepArguments
 
     /// <summary>Whether a prune follows a forget.</summary>
     public bool PruneAfter { get; set; }
+
+    public StepArguments Clone() => new()
+    {
+        SnapshotId = SnapshotId,
+        SnapshotPath = SnapshotPath,
+        TargetDirectory = TargetDirectory,
+        Paths = [.. Paths],
+        SnapshotIds = [.. SnapshotIds],
+        Retention = Retention,
+        CheckDepth = CheckDepth,
+        SubsetPercent = SubsetPercent,
+        PruneAfter = PruneAfter,
+    };
 }
 
 /// <summary>One thing a run does to one storage object.</summary>
@@ -147,6 +160,27 @@ public sealed class RunStep
 
     public string? ErrorMessage { get; set; }
 
+    /// <summary>A copy that shares nothing with this step, for whoever reads it while the run goes on.</summary>
+    public RunStep Clone() => new()
+    {
+        Id = Id,
+        Kind = Kind,
+        TargetObjectId = TargetObjectId,
+        State = State,
+        Arguments = Arguments.Clone(),
+        Lines = [.. Lines.Select(l => new PlanLine { Action = l.Action, Path = l.Path, Size = l.Size })],
+        LinesTruncated = LinesTruncated,
+        ToAdd = ToAdd,
+        ToChange = ToChange,
+        ToDelete = ToDelete,
+        Bytes = Bytes,
+        Notes = [.. Notes],
+        Progress = Progress,
+        BytesDone = BytesDone,
+        ErrorCode = ErrorCode,
+        ErrorMessage = ErrorMessage,
+    };
+
     /// <summary>Whether this step removes data that cannot be had back. A step with nothing to do removes nothing.</summary>
     public bool Destructive => State != StepState.UpToDate && (Kind is StepKind.Forget or StepKind.Prune || ToDelete > 0);
 }
@@ -180,6 +214,23 @@ public sealed class Run
     public string? ErrorMessage { get; set; }
 
     public bool Destructive => Steps.Any(s => s.Destructive);
+
+    /// <summary>A copy that shares nothing with this run.</summary>
+    public Run Clone() => new()
+    {
+        Id = Id,
+        Kind = Kind,
+        GroupId = GroupId,
+        GroupName = GroupName,
+        SourceObjectId = SourceObjectId,
+        Fingerprint = Fingerprint,
+        State = State,
+        CreatedAt = CreatedAt,
+        StartedAt = StartedAt,
+        FinishedAt = FinishedAt,
+        Steps = [.. Steps.Select(s => s.Clone())],
+        ErrorMessage = ErrorMessage,
+    };
 
     public static readonly TimeSpan PlanLifetime = TimeSpan.FromMinutes(30);
 

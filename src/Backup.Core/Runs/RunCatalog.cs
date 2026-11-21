@@ -55,19 +55,21 @@ public sealed class RunCatalog
         }
     }
 
+    /// <summary>Copies of the runs, newest first. A run goes on changing while it is read and sent out, so what leaves the lock is a copy.</summary>
     public IReadOnlyList<Run> List()
     {
         lock (_gate)
         {
-            return [.. _runs.OrderByDescending(r => r.CreatedAt)];
+            return [.. _runs.OrderByDescending(r => r.CreatedAt).Select(r => r.Clone())];
         }
     }
 
+    /// <summary>A copy of the run; changes to it are not changes to the run (use <see cref="Update"/>).</summary>
     public Run? Find(string id)
     {
         lock (_gate)
         {
-            return _runs.Find(r => r.Id == id);
+            return _runs.Find(r => r.Id == id)?.Clone();
         }
     }
 
@@ -75,7 +77,7 @@ public sealed class RunCatalog
     {
         lock (_gate)
         {
-            return _runs.Find(r => r.State == RunState.Running);
+            return _runs.Find(r => r.State == RunState.Running)?.Clone();
         }
     }
 

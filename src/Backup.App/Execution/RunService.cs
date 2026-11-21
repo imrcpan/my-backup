@@ -35,7 +35,7 @@ public sealed partial class RunService(
     public Run Register(Run plan)
     {
         runs.Add(plan);
-        return plan;
+        return runs.Find(plan.Id)!;
     }
 
     /// <summary>Completes when the run is over; at once if it is not going. The state of the run is final by then.</summary>

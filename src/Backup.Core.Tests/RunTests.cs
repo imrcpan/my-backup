@@ -171,4 +171,75 @@ public class RunTests
         catalog.Add(new Run { Id = "b", State = RunState.Succeeded, CreatedAt = Now.AddHours(1) });
         Assert.Equal(["b", "a"], catalog.List().Select(r => r.Id));
     }
+
+    [Fact]
+    public async Task A_run_that_is_read_while_it_changes_is_a_consistent_copy_and_never_throws()
+    {
+        RunCatalog catalog = new(new MemoryRunStore(), Now);
+        Run run = Planned(StepKind.ResticBackup);
+        run.State = RunState.Running;
+        catalog.Add(run);
+        using CancellationTokenSource stop = new();
+
+        // The executor changes the lists of the run while the interface reads and serializes it.
+        Task writer = Task.Run(() =>
+        {
+            for (int i = 0; i < 20_000; i++)
+            {
+                catalog.Update(run.Id, r =>
+                {
+                    r.Steps[0].Notes.Add("n" + i);
+                    r.Steps[0].Lines.Add(new PlanLine { Action = "new", Path = "/p" + i });
+                    if (r.Steps[0].Notes.Count > 50)
+                    {
+                        r.Steps[0].Notes.Clear();
+                        r.Steps[0].Lines.Clear();
+                    }
+                });
+            }
+
+            stop.Cancel();
+        }, TestContext.Current.CancellationToken);
+        Task reader = Task.Run(() =>
+        {
+            while (!stop.IsCancellationRequested)
+            {
+                foreach (Run copy in catalog.List())
+                {
+                    Assert.Equal(copy.Steps[0].Notes.Count, copy.Steps[0].Notes.Count);
+                    foreach (string note in copy.Steps[0].Notes)
+                    {
+                        _ = note.Length;
+                    }
+
+                    foreach (PlanLine line in catalog.Find(run.Id)!.Steps[0].Lines)
+                    {
+                        _ = line.Path.Length;
+                    }
+                }
+            }
+        }, TestContext.Current.CancellationToken);
+
+        await Task.WhenAll(writer, reader);
+    }
+
+    [Fact]
+    public void What_Find_and_List_return_is_a_copy_that_does_not_change_the_catalog()
+    {
+        RunCatalog catalog = new(new MemoryRunStore(), Now);
+        Run run = Planned();
+        catalog.Add(run);
+
+        Run copy = catalog.Find(run.Id)!;
+        copy.State = RunState.Failed;
+        copy.Steps[0].Notes.Add("tampered");
+        copy.Steps[0].Arguments.Paths.Add("/x");
+        catalog.List()[0].Steps.Clear();
+
+        Run fresh = catalog.Find(run.Id)!;
+        Assert.Equal(RunState.Planned, fresh.State);
+        Assert.Empty(fresh.Steps[0].Notes);
+        Assert.Empty(fresh.Steps[0].Arguments.Paths);
+        Assert.Single(fresh.Steps);
+    }
 }
