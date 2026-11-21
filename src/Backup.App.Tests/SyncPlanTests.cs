@@ -242,4 +242,52 @@ public sealed class SyncPlanTests : IDisposable
         await Assert.ThrowsAsync<DomainException>(() => _fx.Planner.PlanSyncAsync(_fx.GroupId, null, null, _fx.Ct));
         await Assert.ThrowsAsync<DomainException>(() => _fx.Planner.PlanSyncAsync("nope", source.Id, null, _fx.Ct));
     }
+
+    private async Task<(StorageObject Repo, string CompleteId)> RepoWithCompleteThenIncomplete()
+    {
+        StorageObject plain = _fx.LocalSource();
+        StorageObject repo = _fx.Add("gdrive", Path.Combine(_fx.Cloud, "a"), true);
+        await _fx.Restic.InitAsync(_fx.RepoOf(repo), _fx.Ct);
+        string complete = (await _fx.Restic.BackupAsync(_fx.RepoOf(repo), plain.Path, null, _fx.Ct)).SnapshotId;
+        File.WriteAllText(Path.Combine(plain.Path, "more.txt"), "more");
+        string newer = (await _fx.Restic.BackupAsync(_fx.RepoOf(repo), plain.Path, null, _fx.Ct)).SnapshotId;
+        await _fx.Restic.TagAsync(_fx.RepoOf(repo), newer, ResticSnapshot.IncompleteTag, _fx.Ct);
+        return (repo, complete);
+    }
+
+    [Fact]
+    public async Task A_newer_snapshot_that_is_incomplete_is_not_taken_as_the_newest_copy_and_the_plan_says_so()
+    {
+        (StorageObject repo, string complete) = await RepoWithCompleteThenIncomplete();
+        StorageObject target = _fx.Add("local", Path.Combine(_fx.Root, "b-repo"), true);
+
+        RunStep copy = Assert.Single((await Plan(repo, target)).Steps);
+
+        Assert.Equal(StepState.Pending, copy.State);
+        Assert.Equal(complete, copy.Arguments.SnapshotId);
+        Assert.Contains("newer_snapshot_incomplete", copy.Notes);
+
+        StorageObject plainTarget = _fx.Add("disk", "/restored", false);
+        RunStep restore = Assert.Single((await Plan(repo, plainTarget)).Steps);
+        Assert.Equal(complete, restore.Arguments.SnapshotId);
+        Assert.Contains("newer_snapshot_incomplete", restore.Notes);
+    }
+
+    [Fact]
+    public async Task When_every_snapshot_is_incomplete_the_newest_is_used_and_the_plan_says_that_too()
+    {
+        StorageObject plain = _fx.LocalSource();
+        StorageObject repo = _fx.Add("gdrive", Path.Combine(_fx.Cloud, "a"), true);
+        await _fx.Restic.InitAsync(_fx.RepoOf(repo), _fx.Ct);
+        string only = (await _fx.Restic.BackupAsync(_fx.RepoOf(repo), plain.Path, null, _fx.Ct)).SnapshotId;
+        await _fx.Restic.TagAsync(_fx.RepoOf(repo), only, ResticSnapshot.IncompleteTag, _fx.Ct);
+        StorageObject target = _fx.Add("local", Path.Combine(_fx.Root, "b-repo"), true);
+
+        RunStep copy = Assert.Single((await Plan(repo, target)).Steps);
+
+        Assert.Equal(StepState.Pending, copy.State);
+        Assert.Contains("only_incomplete_snapshots", copy.Notes);
+        Assert.DoesNotContain("newer_snapshot_incomplete", copy.Notes);
+        Assert.NotNull(copy.Arguments.SnapshotId);
+    }
 }

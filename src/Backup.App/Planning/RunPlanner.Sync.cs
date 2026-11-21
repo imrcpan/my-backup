@@ -90,7 +90,7 @@ public sealed partial class RunPlanner
         await EnsureReadyAsync(from, cancellationToken);
         await EnsureReadyAsync(to, cancellationToken);
 
-        ResticSnapshot latest = await LatestSnapshotAsync(Repository(from), cancellationToken);
+        ResticSnapshot latest = await LatestSnapshotAsync(Repository(from), step, cancellationToken);
         ResticRepository destination = Repository(to);
         if (await restic.ExistsAsync(destination, cancellationToken))
         {
@@ -152,7 +152,7 @@ public sealed partial class RunPlanner
             throw new DomainException("restore_target_not_empty", "A snapshot is restored only into a new or empty directory.");
         }
 
-        ResticSnapshot latest = await LatestSnapshotAsync(Repository(from), cancellationToken);
+        ResticSnapshot latest = await LatestSnapshotAsync(Repository(from), step, cancellationToken);
         step.Arguments.SnapshotId = latest.Id;
         step.Arguments.SnapshotPath = latest.Paths.Length == 1 ? latest.Paths[0] : null;
         step.ToAdd = latest.Summary?.TotalFilesProcessed ?? 0;
@@ -160,7 +160,11 @@ public sealed partial class RunPlanner
         step.Lines.Add(new PlanLine { Action = "restore", Path = $"{latest.ShortId} ({latest.Time:yyyy-MM-dd HH:mm})", Size = step.Bytes });
     }
 
-    private async Task<ResticSnapshot> LatestSnapshotAsync(ResticRepository repository, CancellationToken cancellationToken)
+    /// <summary>
+    /// The newest snapshot that was made from a complete backup. A newer one that is marked incomplete is passed over, and the
+    /// plan says so; if every snapshot is incomplete, the newest of them is taken, and the plan says that too.
+    /// </summary>
+    private async Task<ResticSnapshot> LatestSnapshotAsync(ResticRepository repository, RunStep step, CancellationToken cancellationToken)
     {
         if (!await restic.ExistsAsync(repository, cancellationToken))
         {
@@ -168,8 +172,23 @@ public sealed partial class RunPlanner
         }
 
         IReadOnlyList<ResticSnapshot> snapshots = await restic.SnapshotsAsync(repository, cancellationToken);
-        return snapshots.Count > 0
-            ? snapshots[^1]
-            : throw new DomainException("source_has_no_snapshots", "The repository with the newest copy has no snapshot.");
+        if (snapshots.Count == 0)
+        {
+            throw new DomainException("source_has_no_snapshots", "The repository with the newest copy has no snapshot.");
+        }
+
+        ResticSnapshot[] complete = [.. snapshots.Where(s => !s.IsIncomplete)];
+        if (complete.Length == 0)
+        {
+            step.Notes.Add("only_incomplete_snapshots");
+            return snapshots[^1];
+        }
+
+        if (snapshots[^1].IsIncomplete)
+        {
+            step.Notes.Add("newer_snapshot_incomplete");
+        }
+
+        return complete[^1];
     }
 }
