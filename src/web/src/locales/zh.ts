@@ -359,6 +359,7 @@ export const zh: Record<keyof typeof en, string> = {
   'devices.disks.added': '已添加为 {name}',
   'devices.disks.internal': '内置',
   'devices.disks.unknown': '磁盘',
-  "step.note.partial_output_removed": "执行已停止，这次恢复已经写入的内容都被清除了，因为写了一半的文件可能看起来像是完整的。",
-  "step.note.partial_output_left": "执行已停止，但这次恢复写入的内容没能清除。使用之前请手动删除这个文件夹。",
+  'step.note.partial_output_removed':
+    '执行已停止，这次恢复已经写入的内容都被清除了，因为写了一半的文件可能看起来像是完整的。',
+  'step.note.partial_output_left': '执行已停止，但这次恢复写入的内容没能清除。使用之前请手动删除这个文件夹。',
 }

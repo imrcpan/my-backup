@@ -366,6 +366,8 @@ export const en = {
   'devices.disks.added': 'already added as {name}',
   'devices.disks.internal': 'internal',
   'devices.disks.unknown': 'Disk',
-  "step.note.partial_output_removed": "The run stopped, and what this restore had written so far was removed, because a half-written file can look whole.",
-  "step.note.partial_output_left": "The run stopped, but what this restore had written could not be removed. Delete the folder by hand before you use it.",
+  'step.note.partial_output_removed':
+    'The run stopped, and what this restore had written so far was removed, because a half-written file can look whole.',
+  'step.note.partial_output_left':
+    'The run stopped, but what this restore had written could not be removed. Delete the folder by hand before you use it.',
 } as const
