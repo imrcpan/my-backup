@@ -124,4 +124,46 @@ public class WorkspaceTests
         Assert.Equal(50, workspace.Read((_, groups) => groups.Groups.Count));
         Assert.Equal(50, store.State.Groups.Count);
     }
+
+    private sealed class FailingStore : IStateStore
+    {
+        public AppState Saved { get; private set; } = new();
+
+        public bool Fail { get; set; }
+
+        public AppState Load() => Saved;
+
+        public void Save(AppState state)
+        {
+            if (Fail)
+            {
+                throw new IOException("No space left on device");
+            }
+
+            Saved = state;
+        }
+    }
+
+    [Fact]
+    public void A_change_that_cannot_be_saved_is_undone_so_that_memory_and_disk_agree()
+    {
+        FailingStore store = new();
+        Workspace workspace = new(store);
+        string kept = workspace.Write((_, groups) => groups.AddGroup("Kept")).Id;
+
+        store.Fail = true;
+        Assert.Throws<IOException>(() => workspace.Write((_, groups) => groups.AddGroup("Lost")));
+        Assert.Throws<IOException>(() => workspace.AddObject(kept, "local", "/x", false, null));
+        Assert.Throws<IOException>(() => workspace.Write((devices, _) => devices.Add(new("media", "Media", StorageDeviceKind.ExternalDisk, Uuid: "1234-ABCD"))));
+
+        Assert.Equal(["Kept"], workspace.Read((_, groups) => groups.Groups.Select(g => g.Name).ToArray()));
+        Assert.Empty(workspace.Read((_, groups) => groups.Get(kept).Objects));
+        Assert.Null(workspace.Read((devices, _) => devices.Find("media")));
+
+        // The next change that can be saved does not carry the ones that could not.
+        store.Fail = false;
+        workspace.Write((_, groups) => groups.AddGroup("Later"));
+        Assert.Equal(["Kept", "Later"], store.Saved.Groups.Select(g => g.Name));
+        Assert.DoesNotContain(store.Saved.Devices, d => d.Id == "media");
+    }
 }

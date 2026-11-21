@@ -8,13 +8,17 @@ public sealed class Workspace
 {
     private readonly object _gate = new();
     private readonly IStateStore _store;
-    private readonly StorageDeviceCatalog _devices;
-    private readonly BackupGroupCatalog _groups;
+    private StorageDeviceCatalog _devices;
+    private BackupGroupCatalog _groups;
+
+    /// <summary>What was saved last, as a copy that nothing else changes. A change that fails goes back to it.</summary>
+    private AppState _committed;
 
     public Workspace(IStateStore store)
     {
         _store = store;
         AppState state = store.Load();
+        _committed = Copy(state);
         _devices = new StorageDeviceCatalog(state.Devices);
         _groups = new BackupGroupCatalog(state.Groups);
     }
@@ -28,16 +32,34 @@ public sealed class Workspace
         }
     }
 
-    /// <summary>Changes under the lock and saves. If the change throws, nothing is saved; a change must therefore check before it mutates.</summary>
+    /// <summary>
+    /// Changes under the lock and saves. If the change throws, or the save fails (a disk that is full), what the change did is
+    /// undone, so that what is in memory is what is on disk and a later change that can be saved does not carry this one.
+    /// </summary>
     public T Write<T>(Func<StorageDeviceCatalog, BackupGroupCatalog, T> change)
     {
         lock (_gate)
         {
-            T result = change(_devices, _groups);
-            _store.Save(new AppState { Devices = [.. _devices.Devices], Groups = [.. _groups.Groups] });
-            return result;
+            try
+            {
+                T result = change(_devices, _groups);
+                AppState state = new() { Devices = [.. _devices.Devices], Groups = [.. _groups.Groups.Select(Copy)] };
+                _store.Save(state);
+                _committed = state;
+                return result;
+            }
+            catch
+            {
+                _devices = new StorageDeviceCatalog(_committed.Devices);
+                _groups = new BackupGroupCatalog(_committed.Groups.Select(Copy));
+                throw;
+            }
         }
     }
+
+    private static AppState Copy(AppState state) => new() { Devices = [.. state.Devices], Groups = [.. state.Groups.Select(Copy)] };
+
+    private static BackupGroup Copy(BackupGroup group) => new() { Id = group.Id, Name = group.Name, Objects = [.. group.Objects] };
 
     /// <summary>A device that a storage object uses cannot be removed; it would leave the object without a place.</summary>
     public void RemoveDevice(string deviceId) => Write((devices, groups) =>
