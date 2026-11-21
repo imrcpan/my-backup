@@ -131,6 +131,14 @@ public sealed partial class RunPlanner
                 plan = await restic.PlanForgetSnapshotsAsync(repository, snapshotIds, cancellationToken);
             }
 
+            // A snapshot from an incomplete backup must never be what is left when a complete one is removed.
+            if (plan.Remove.Any(s => !s.IsIncomplete) && !plan.Keep.Any(s => !s.IsIncomplete))
+            {
+                throw new DomainException(
+                    "forget_would_remove_last_complete",
+                    "This would remove every complete snapshot and leave only incomplete ones. Keep more snapshots, or remove the incomplete ones by choice.");
+            }
+
             step.Arguments.SnapshotIds = [.. plan.Remove.Select(s => s.Id)];
             step.Arguments.PruneAfter = pruneAfter;
             step.ToDelete = plan.Remove.Count;

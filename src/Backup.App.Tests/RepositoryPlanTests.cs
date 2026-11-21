@@ -172,4 +172,85 @@ public sealed class RepositoryPlanTests : IDisposable
         Assert.Equal("object_not_a_repository", Assert.Single((await _fx.Planner.PlanPruneAsync(_fx.GroupId, plain.Id, _fx.Ct)).Steps).ErrorCode);
         await Assert.ThrowsAsync<DomainException>(() => _fx.Planner.PlanPruneAsync(_fx.GroupId, "nope", _fx.Ct));
     }
+
+    private async Task<(StorageObject Repo, string[] Complete, string Incomplete)> RepoWithTwoCompleteAndOneIncomplete()
+    {
+        StorageObject source = _fx.LocalSource();
+        StorageObject repo = _fx.Add("gdrive", Path.Combine(_fx.Cloud, "repo"), true);
+        await _fx.Restic.InitAsync(_fx.RepoOf(repo), _fx.Ct);
+        for (int i = 0; i < 3; i++)
+        {
+            File.WriteAllText(Path.Combine(source.Path, "a.txt"), $"version {i}");
+            string id = (await _fx.Restic.BackupAsync(_fx.RepoOf(repo), source.Path, null, _fx.Ct)).SnapshotId;
+            if (i == 2)
+            {
+                // Tagging makes a new snapshot with another id.
+                await _fx.Restic.TagAsync(_fx.RepoOf(repo), id, ResticSnapshot.IncompleteTag, _fx.Ct);
+            }
+        }
+
+        ResticSnapshot[] all = [.. await _fx.Restic.SnapshotsAsync(_fx.RepoOf(repo), _fx.Ct)];
+        return (repo, [.. all.Where(s => !s.IsIncomplete).Select(s => s.Id)], all.Single(s => s.IsIncomplete).Id);
+    }
+
+    [Fact]
+    public async Task A_policy_that_would_leave_only_the_incomplete_snapshot_is_blocked_and_removes_nothing()
+    {
+        (StorageObject repo, _, _) = await RepoWithTwoCompleteAndOneIncomplete();
+        _fx.Workspace.Write((_, groups) => groups.SetRetention(_fx.GroupId, repo.Id, new RetentionPolicy(KeepLast: 1)));
+
+        RunStep step = Assert.Single((await _fx.Planner.PlanForgetAsync(_fx.GroupId, repo.Id, null, false, _fx.Ct)).Steps);
+
+        Assert.Equal(StepState.Blocked, step.State);
+        Assert.Equal("forget_would_remove_last_complete", step.ErrorCode);
+        Assert.Equal(3, (await _fx.Restic.SnapshotsAsync(_fx.RepoOf(repo), _fx.Ct)).Count);
+    }
+
+    [Fact]
+    public async Task A_policy_that_keeps_a_complete_snapshot_is_planned_as_before()
+    {
+        (StorageObject repo, string[] complete, _) = await RepoWithTwoCompleteAndOneIncomplete();
+        _fx.Workspace.Write((_, groups) => groups.SetRetention(_fx.GroupId, repo.Id, new RetentionPolicy(KeepLast: 2)));
+
+        RunStep step = Assert.Single((await _fx.Planner.PlanForgetAsync(_fx.GroupId, repo.Id, null, false, _fx.Ct)).Steps);
+
+        Assert.Equal(StepState.Pending, step.State);
+        Assert.Equal([complete[0]], step.Arguments.SnapshotIds);
+    }
+
+    [Fact]
+    public async Task Choosing_the_last_complete_snapshots_is_blocked_but_choosing_the_incomplete_one_is_not()
+    {
+        (StorageObject repo, string[] complete, string incomplete) = await RepoWithTwoCompleteAndOneIncomplete();
+
+        RunStep all = Assert.Single((await _fx.Planner.PlanForgetAsync(_fx.GroupId, repo.Id, complete, false, _fx.Ct)).Steps);
+        Assert.Equal("forget_would_remove_last_complete", all.ErrorCode);
+
+        RunStep one = Assert.Single((await _fx.Planner.PlanForgetAsync(_fx.GroupId, repo.Id, [complete[0]], false, _fx.Ct)).Steps);
+        Assert.Equal(StepState.Pending, one.State);
+
+        RunStep bad = Assert.Single((await _fx.Planner.PlanForgetAsync(_fx.GroupId, repo.Id, [incomplete], false, _fx.Ct)).Steps);
+        Assert.Equal(StepState.Pending, bad.State);
+        Assert.Equal([incomplete], bad.Arguments.SnapshotIds);
+    }
+
+    [Fact]
+    public async Task When_every_snapshot_is_incomplete_a_clean_up_is_not_held_back()
+    {
+        StorageObject source = _fx.LocalSource();
+        StorageObject repo = _fx.Add("gdrive", Path.Combine(_fx.Cloud, "repo"), true);
+        await _fx.Restic.InitAsync(_fx.RepoOf(repo), _fx.Ct);
+        for (int i = 0; i < 2; i++)
+        {
+            File.WriteAllText(Path.Combine(source.Path, "a.txt"), $"v{i}");
+            string id = (await _fx.Restic.BackupAsync(_fx.RepoOf(repo), source.Path, null, _fx.Ct)).SnapshotId;
+            await _fx.Restic.TagAsync(_fx.RepoOf(repo), id, ResticSnapshot.IncompleteTag, _fx.Ct);
+        }
+
+        _fx.Workspace.Write((_, groups) => groups.SetRetention(_fx.GroupId, repo.Id, new RetentionPolicy(KeepLast: 1)));
+        RunStep step = Assert.Single((await _fx.Planner.PlanForgetAsync(_fx.GroupId, repo.Id, null, false, _fx.Ct)).Steps);
+
+        Assert.Equal(StepState.Pending, step.State);
+        Assert.Equal(1, step.ToDelete);
+    }
 }
