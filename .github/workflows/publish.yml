@@ -10,7 +10,8 @@ name: Publish
 # No cache is used (no cache: in setup-node, none in setup-dotnet, no actions/cache): every build starts clean.
 # The archives kept as workflow artifacts are kept for 1 day, the shortest time there is.
 #
-# Everything runs on ubuntu-latest, which is x64. The arm64 program is cross-compiled there; no arm runner is used.
+# Everything runs on ubuntu-latest, which is x64. The arm64 program is cross-compiled there, in the cross-compilation
+# image of the .NET build; no arm runner is used.
 on:
   workflow_dispatch:
     inputs:
@@ -86,28 +87,10 @@ jobs:
         with:
           dotnet-version: 11.0.x
 
-      # Native AOT for arm64 on an x64 machine needs the arm64 linker libraries and the arm64 binutils.
-      - name: Tools to cross-compile for arm64
-        if: matrix.arch == 'arm64'
-        run: |
-          # The arm64 packages must come from the same release of Ubuntu as the amd64 ones of the machine: zlib1g-dev needs
-          # the same version for both architectures, so the release is read here and is not written into this file.
-          codename="$(. /etc/os-release && echo "$VERSION_CODENAME")"
-          echo "Ubuntu $codename"
-          sudo dpkg --add-architecture arm64
-          # The mirror of the machine is for amd64 only; the packages of arm64 come from ports.ubuntu.com.
-          sudo sed -i '/^Types: deb$/a Architectures: amd64' /etc/apt/sources.list.d/ubuntu.sources
-          sudo tee /etc/apt/sources.list.d/ubuntu-arm64.sources >/dev/null <<EOF
-          Types: deb
-          URIs: http://ports.ubuntu.com/ubuntu-ports
-          Suites: $codename $codename-updates $codename-security
-          Components: main universe
-          Architectures: arm64
-          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-          EOF
-          sudo apt-get update
-          apt-cache policy zlib1g:amd64 zlib1g:arm64 | grep -E "zlib1g|Candidate"
-          sudo apt-get install -y clang llvm binutils-aarch64-linux-gnu gcc-aarch64-linux-gnu zlib1g-dev:arm64
+      # The x64 program is made on the machine, which has what Native AOT needs; this only makes sure.
+      - name: Tools for Native AOT on x64
+        if: matrix.arch == 'x64'
+        run: sudo apt-get install -y clang zlib1g-dev
 
       - name: Build the web interface
         working-directory: src/web
@@ -115,13 +98,32 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm build   # writes into src/Backup.Server/wwwroot
 
-      - name: Publish with Native AOT
+      - name: Publish with Native AOT (x64)
+        if: matrix.arch == 'x64'
+        run: dotnet publish src/Backup.Server -c Release -r "$RID" -p:Version="$VERSION" -o publish
+
+      # The arm64 program is cross-compiled in the image that the .NET build itself uses for this: it has the arm64
+      # libraries (/crossrootfs/arm64), clang and lld. That avoids installing arm64 packages next to the amd64 ones of the
+      # machine with apt, which cannot be done when the versions of the two architectures differ. The SDK of the machine is
+      # mounted into the image; the program is linked against old enough libraries to run on most Linux distributions.
+      - name: Publish with Native AOT (arm64, cross-compiled)
+        if: matrix.arch == 'arm64'
+        env:
+          IMAGE: mcr.microsoft.com/dotnet-buildtools/prereqs:azurelinux-3.0-net11.0-cross-arm64
         run: |
-          extra=()
-          if [ "$ARCH" = "arm64" ]; then
-            extra=(-p:CppCompilerAndLinker=clang -p:SysRoot=/ -p:ObjCopyName=aarch64-linux-gnu-objcopy)
-          fi
-          dotnet publish src/Backup.Server -c Release -r "$RID" -p:Version="$VERSION" "${extra[@]}" -o publish
+          dotnet_root="$(dirname "$(readlink -f "$(command -v dotnet)")")"
+          mkdir -p "$RUNNER_TEMP/home" "$RUNNER_TEMP/nuget"
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -v "$GITHUB_WORKSPACE":/work -w /work \
+            -v "$dotnet_root":/dotnet:ro \
+            -v "$RUNNER_TEMP/home":/home/build -v "$RUNNER_TEMP/nuget":/nuget \
+            -e HOME=/home/build -e DOTNET_ROOT=/dotnet -e PATH=/dotnet:/usr/local/bin:/usr/bin:/bin -e NUGET_PACKAGES=/nuget \
+            -e DOTNET_CLI_TELEMETRY_OPTOUT=1 -e DOTNET_NOLOGO=1 -e DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1 \
+            "$IMAGE" \
+            dotnet publish src/Backup.Server -c Release -r linux-arm64 -p:Version="$VERSION" \
+              -p:CppCompilerAndLinker=clang -p:SysRoot=/crossrootfs/arm64 -p:LinkerFlavor=lld -p:ObjCopyName=llvm-objcopy \
+              -o publish
 
       - name: Make the archive
         run: |
