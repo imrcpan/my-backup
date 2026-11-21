@@ -25,6 +25,13 @@ public static class ErrorMapping
             app.Logger.LogWarning("{Method} {Path} failed in an external tool ({Code}): {Message}", context.Request.Method, context.Request.Path, error.Code, error.Message);
             await Write(context, StatusCodes.Status502BadGateway, new ApiError(error.Code, error.Message));
         }
+        catch (Exception error) when (IsBadRequest(error))
+        {
+            // The body could not be read as what the endpoint takes. The person who sent it did something wrong, not the server.
+            // The framework knows better than 400 for some of them: a body that is too large is 413.
+            int status = error is BadHttpRequestException bad ? bad.StatusCode : StatusCodes.Status400BadRequest;
+            await Write(context, status, new ApiError("bad_request", "The request is not valid: " + FirstLine(error.Message)));
+        }
         catch (Exception error) when (error is not OperationCanceledException)
         {
             app.Logger.LogError(error, "{Method} {Path} failed unexpectedly.", context.Request.Method, context.Request.Path);
@@ -32,6 +39,16 @@ public static class ErrorMapping
             await Write(context, StatusCodes.Status500InternalServerError, new ApiError("unexpected", Describe(app, error)));
         }
     });
+
+    /// <summary>
+    /// A body that is not JSON or is not the expected shape. The framework reports it as a BadHttpRequestException or the
+    /// serializer as a JsonException (sometimes as an InvalidOperationException that comes from System.Text.Json).
+    /// </summary>
+    internal static bool IsBadRequest(Exception error) =>
+        error is BadHttpRequestException or System.Text.Json.JsonException
+        || (error is InvalidOperationException && error.Source == "System.Text.Json");
+
+    private static string FirstLine(string message) => message.Split('\n')[0].Trim();
 
     private static string Describe(WebApplication app, Exception error)
     {

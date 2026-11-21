@@ -10,7 +10,12 @@ if (!CommandLine.TryGetPort(builder.Configuration["Port"], 1580, out int port, o
     return 2;
 }
 
-builder.WebHost.ConfigureKestrel(kestrel => kestrel.ListenLocalhost(port));
+builder.WebHost.ConfigureKestrel(kestrel =>
+{
+    kestrel.ListenLocalhost(port);
+    // Every request body of this API is a small JSON document.
+    kestrel.Limits.MaxRequestBodySize = 1024 * 1024;
+});
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.TypeInfoResolverChain.Insert(0, ApiJson.Default);
