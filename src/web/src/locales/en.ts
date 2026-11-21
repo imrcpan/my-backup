@@ -114,7 +114,7 @@ export const en = {
   'devices.builtin': 'Built in',
   'devices.field.id': 'Id',
   'devices.field.id.hint':
-    'Groups find the device by this id. Another disk with the same id counts as the same device.',
+    'Groups find the device by this id. If you change the disk, give the new one the same id and it counts as the same device.',
   'devices.field.name': 'Name',
   'devices.field.kind': 'Kind',
   'devices.field.uuid': 'File system UUID',

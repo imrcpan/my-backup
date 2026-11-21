@@ -115,7 +115,7 @@ export const zh: Record<keyof typeof en, string> = {
   'devices.kind.Rclone': '云盘',
   'devices.builtin': '内置',
   'devices.field.id': 'id',
-  'devices.field.id.hint': '备份组只通过这个 id 找到设备。换一块 id 相同的硬盘，就当成同一个设备。',
+  'devices.field.id.hint': '备份组只通过这个 id 找到设备。换一块设备，设置成相同的 id，就当成同一个设备。',
   'devices.field.name': '名称',
   'devices.field.kind': '类型',
   'devices.field.uuid': '文件系统 UUID',
