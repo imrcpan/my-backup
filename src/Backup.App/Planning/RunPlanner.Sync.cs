@@ -75,7 +75,8 @@ public sealed partial class RunPlanner
             throw new DomainException("target_not_empty", "The target directory holds other files and no repository. A new repository is not made inside it.");
         }
 
-        DirectoryScan scan = DirectoryScanner.Scan(directory, MaxLines);
+        // A big source takes a while to count; it does not hold a thread of the server, and it stops if the request is dropped.
+        DirectoryScan scan = await Task.Run(() => DirectoryScanner.Scan(directory, MaxLines, cancellationToken), cancellationToken);
         step.Notes.Add("creates_repository");
         step.ToAdd = scan.Files;
         step.Bytes = scan.Bytes;
