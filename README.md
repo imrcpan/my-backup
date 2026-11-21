@@ -127,6 +127,25 @@ cd .. && dotnet publish Backup.Server -c Release -r linux-x64 -o out
 AOT-compatible in every configuration: the analyzers report any reflection,
 and JSON, request handling and configuration use source generators.
 
+## Run it as a service (systemd)
+
+`my-backup.service` can be copied as it is. It runs the published program from `/opt/my-backup` on
+port 1582 as the user `prc`; change `User=`, `Group=` and the paths in it if yours differ.
+
+```sh
+cd src/web && pnpm build && cd ..
+sudo dotnet publish Backup.Server -c Release -r linux-x64 -o /opt/my-backup   # the interface is read from ./wwwroot there
+sudo cp ../my-backup.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now my-backup          # then open http://localhost:1582
+```
+
+The service user owns the data directory (`~/.local/share/backup-manager`) and the rclone config, so
+sign in to Google (`rclone config`, or "Sign in" in the interface) as that user. `systemctl stop`
+stops a backup that is going the way Ctrl+C does and ends in under a second; the unit allows
+60 seconds for it. A program that cannot start (exit code 2, 3 or 4) is not restarted in a loop.
+With SELinux, publish into a place such as `/opt`; a service is not allowed to run what is in `/tmp`.
+
 ## Tests
 
 ```sh

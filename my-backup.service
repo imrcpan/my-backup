@@ -1,0 +1,52 @@
+# Backup Manager as a systemd service.
+#
+#   sudo cp my-backup.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now my-backup
+#
+# Open http://localhost:1582
+#
+# Before the first start, publish the program into /opt/my-backup (see README.md):
+#
+#   cd src/web && pnpm build && cd ..
+#   dotnet publish Backup.Server -c Release -r linux-x64 -o /opt/my-backup
+#
+# Change User= to the account whose files are backed up. It owns the data directory
+# (~/.local/share/backup-manager: state, passwords, run history) and the rclone config
+# (~/.config/rclone/rclone.conf), so run "rclone config" or sign in to Google as that user.
+# restic and rclone must be installed and be found in PATH.
+
+[Unit]
+Description=Backup Manager (restic and rclone)
+Documentation=file:///opt/my-backup/README.md
+After=network-online.target local-fs.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=prc
+Group=prc
+
+# The web interface is read from ./wwwroot next to the program, so this must be the folder of the program.
+WorkingDirectory=/opt/my-backup
+ExecStart=/opt/my-backup/backup-manager -p 1582
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# The program ends with 2, 3 or 4 when it cannot start (a port that is not a number or that is in use, a data
+# directory that another instance holds, a state file that cannot be read). Starting again would not help.
+Restart=on-failure
+RestartSec=5
+RestartPreventExitStatus=2 3 4
+
+# On stop the program stops a backup that is going, as Ctrl+C does, so that restic can release its lock and
+# rclone can remove its half-written files, and only then ends. It needs a little time for that;
+# after the timeout everything that is left is killed.
+KillSignal=SIGTERM
+KillMode=mixed
+TimeoutStopSec=60
+
+# It reads the files that are backed up and writes the targets, so the file system is not restricted. It needs no new privileges.
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
