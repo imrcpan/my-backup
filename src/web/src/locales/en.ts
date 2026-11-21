@@ -355,4 +355,15 @@ export const en = {
   'error.object_is_a_repository': 'An encrypted object holds snapshots. Browse those.',
   'error.path_escapes_object': 'The path goes through a link, which is not followed.',
   'error.object_not_a_folder': 'This object is not a folder.',
+  'devices.disks.title': 'Connected disks',
+  'devices.disks.placeholder': 'Choose a connected disk',
+  'devices.disks.hint':
+    'Plugged in just now? Refresh the list. Choosing a disk fills in its UUID; you can also type it below.',
+  'devices.disks.refresh': 'Refresh the list',
+  'devices.disks.none': 'No disks found. Plug the disk in and refresh the list.',
+  'devices.disks.mounted': 'mounted',
+  'devices.disks.unmounted': 'not mounted',
+  'devices.disks.added': 'already added as {name}',
+  'devices.disks.internal': 'internal',
+  'devices.disks.unknown': 'Disk',
 } as const

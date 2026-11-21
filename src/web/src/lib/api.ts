@@ -3,6 +3,7 @@ import type {
   Device,
   DeviceInput,
   DeviceStatus,
+  Disk,
   Directory,
   FileListing,
   Group,
@@ -60,6 +61,7 @@ const enc = encodeURIComponent
 
 export const api = {
   system: () => request<SystemInfo>('GET', '/api/system'),
+  disks: () => request<Disk[]>('GET', '/api/disks'),
 
   devices: {
     list: () => request<Device[]>('GET', '/api/devices'),

@@ -126,3 +126,16 @@ export type FileEntry = {
 }
 
 export type FileListing = { entries: FileEntry[]; truncated: boolean }
+
+export type Disk = {
+  uuid: string
+  device: string
+  label?: string
+  fileSystem?: string
+  sizeBytes?: number
+  model?: string
+  transport?: string
+  removable: boolean
+  mountPoint?: string
+  deviceId?: string
+}

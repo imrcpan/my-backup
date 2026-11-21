@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { DiskPicker, diskName } from '@/components/disk-picker'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -14,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { api } from '@/lib/api'
 import { useI18n } from '@/lib/i18n'
+import type { Disk } from '@/lib/types'
 import { useNotify } from '@/lib/notify'
 import type { Device, DeviceKind } from '@/lib/types'
 
@@ -30,6 +32,7 @@ export function DeviceDialog({
   const { t } = useI18n()
   const notify = useNotify()
   const queryClient = useQueryClient()
+  const known = useQuery({ queryKey: ['devices'], queryFn: api.devices.list, enabled: open })
   const [id, setId] = useState('')
   const [name, setName] = useState('')
   const [kind, setKind] = useState<DeviceKind>('ExternalDisk')
@@ -63,6 +66,21 @@ export function DeviceDialog({
     },
     onError: notify.error,
   })
+
+  /** Choosing a disk fills in its UUID, and a name and an id if there are none yet. */
+  const pickDisk = (disk: Disk) => {
+    setUuid(disk.uuid)
+    const name_ = diskName(disk, '')
+    if (name.trim() === '' && name_ !== '') setName(name_)
+    if (id.trim() === '' && device == null) {
+      const slug = name_
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]+/g, '-')
+        .replace(/^[^a-z0-9]+|-+$/g, '')
+        .slice(0, 32)
+      if (slug !== '') setId(slug)
+    }
+  }
 
   const kinds: { value: DeviceKind; label: string }[] = [
     { value: 'ExternalDisk', label: t('devices.kind.ExternalDisk') },
@@ -127,17 +145,20 @@ export function DeviceDialog({
               </Select>
             </Field>
             {kind === 'ExternalDisk' && (
-              <Field>
-                <FieldLabel htmlFor="device-uuid">{t('devices.field.uuid')}</FieldLabel>
-                <Input
-                  id="device-uuid"
-                  value={uuid}
-                  autoComplete="off"
-                  placeholder="1234-ABCD"
-                  onChange={(event) => setUuid(event.target.value)}
-                />
-                <FieldDescription>{t('devices.field.uuid.hint')}</FieldDescription>
-              </Field>
+              <>
+                <DiskPicker uuid={uuid} onPick={pickDisk} currentDeviceId={device?.id} devices={known.data ?? []} />
+                <Field>
+                  <FieldLabel htmlFor="device-uuid">{t('devices.field.uuid')}</FieldLabel>
+                  <Input
+                    id="device-uuid"
+                    value={uuid}
+                    autoComplete="off"
+                    placeholder="1234-ABCD"
+                    onChange={(event) => setUuid(event.target.value)}
+                  />
+                  <FieldDescription>{t('devices.field.uuid.hint')}</FieldDescription>
+                </Field>
+              </>
             )}
             {kind === 'Rclone' && (
               <Field>
