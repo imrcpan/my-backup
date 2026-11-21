@@ -2,7 +2,7 @@ import { AlertTriangleIcon, DownloadIcon, InfoIcon } from 'lucide-react'
 import { StepStateBadge } from '@/components/state-badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { formatBytes } from '@/lib/format'
@@ -102,6 +102,20 @@ function StepCard({ runId, step, target }: { runId: string; step: RunStep; targe
           <StepStateBadge state={step.state} />
         </CardTitle>
         <CardDescription className="font-mono break-all">{target}</CardDescription>
+        {step.hasDiff && step.lines.length > 0 && (
+          <CardAction>
+            <Button
+              variant="outline"
+              size="sm"
+              render={
+                <a href={`/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step.id)}/diff`} download />
+              }
+            >
+              <DownloadIcon />
+              {t('step.diff.download')}
+            </Button>
+          </CardAction>
+        )}
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {(step.toAdd > 0 || step.toChange > 0 || step.toDelete > 0 || step.bytes > 0) && (
@@ -160,23 +174,6 @@ function StepCard({ runId, step, target }: { runId: string; step: RunStep; targe
                 )}
               </div>
             </ScrollArea>
-            {step.hasDiff && (
-              <div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  render={
-                    <a
-                      href={`/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step.id)}/diff`}
-                      download
-                    />
-                  }
-                >
-                  <DownloadIcon />
-                  {t('step.diff.download')}
-                </Button>
-              </div>
-            )}
           </div>
         )}
         {step.lines.length === 0 && step.state === 'UpToDate' && (
