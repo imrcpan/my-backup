@@ -85,6 +85,13 @@ public sealed class RunCatalog
     {
         lock (_gate)
         {
+            // A plan that nobody confirmed in time can no longer be started; it is discarded here and not only at the next start.
+            foreach (Run old in _runs.Where(r => r.State == RunState.Planned && run.CreatedAt - r.CreatedAt > Run.PlanLifetime))
+            {
+                old.State = RunState.Discarded;
+                old.FinishedAt = run.CreatedAt;
+            }
+
             _runs.Add(run);
             Trim();
             Save();

@@ -242,4 +242,23 @@ public class RunTests
         Assert.Empty(fresh.Steps[0].Arguments.Paths);
         Assert.Single(fresh.Steps);
     }
+
+    [Fact]
+    public void A_plan_that_nobody_confirmed_in_time_is_discarded_when_the_next_run_is_added_and_a_recent_one_is_not()
+    {
+        RunCatalog catalog = new(new MemoryRunStore(), Now);
+        Run stale = Planned(at: Now);
+        Run recent = Planned(at: Now.AddMinutes(20));
+        catalog.Add(stale);
+        catalog.Add(recent);
+        Assert.Equal(RunState.Planned, catalog.Find(stale.Id)!.State);
+
+        catalog.Add(Planned(at: Now.AddMinutes(45)));
+
+        Run discarded = catalog.Find(stale.Id)!;
+        Assert.Equal(RunState.Discarded, discarded.State);
+        Assert.Equal(Now.AddMinutes(45), discarded.FinishedAt);
+        Assert.Equal(RunState.Planned, catalog.Find(recent.Id)!.State);
+        Assert.Equal("run_not_planned", CodeOf(() => discarded.EnsureCanStart(Now.AddMinutes(45), true)));
+    }
 }
