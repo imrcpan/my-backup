@@ -67,7 +67,7 @@ Only one instance can use a data directory; a second one refuses to start.
 ## Requirements
 
 - Linux with `restic` and `rclone` installed
-- .NET SDK 11 (a preview or release candidate is fine) and Node.js with pnpm
+- .NET SDK 11 and Node.js with pnpm
 
 For Google Drive, add a cloud device (or use the built-in one) and choose
 "Sign in to Google" in its menu; rclone opens a browser for the sign-in.

@@ -82,8 +82,6 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 11.0.x
-          # The project is on .NET 11 while it is in preview or release candidate. Change this when it is released.
-          dotnet-quality: preview
 
       # Native AOT for arm64 on an x64 machine needs the arm64 linker libraries and the arm64 binutils.
       - name: Tools to cross-compile for arm64
