@@ -11,6 +11,14 @@ public sealed class FakeRestic : IResticClient
 
     public int Backups { get; private set; }
 
+    public List<string> Unlocked { get; } = [];
+
+    public Task UnlockAsync(ResticRepository repository, CancellationToken cancellationToken = default)
+    {
+        Unlocked.Add(repository.Location);
+        return Task.CompletedTask;
+    }
+
     public Task<bool> ExistsAsync(ResticRepository repository, CancellationToken cancellationToken = default) => Task.FromResult(true);
 
     public Task<ResticBackupPlan> PlanBackupAsync(ResticRepository repository, string sourceDirectory, CancellationToken cancellationToken = default) =>

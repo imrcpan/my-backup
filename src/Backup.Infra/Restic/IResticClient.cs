@@ -66,4 +66,10 @@ public interface IResticClient
 
     /// <summary>Copies one snapshot into <paramref name="repository"/>; a snapshot that is there already is skipped.</summary>
     Task CopyAsync(ResticRepository repository, ResticRepository source, string snapshotId, Action<string>? onLine = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes the locks that a program that was killed left behind. Locks of a program that is still going,
+    /// and recent locks of other computers, are kept: restic decides which are stale.
+    /// </summary>
+    Task UnlockAsync(ResticRepository repository, CancellationToken cancellationToken = default);
 }

@@ -69,6 +69,9 @@ public sealed partial class ResticClient(IProcessRunner runner, ResticOptions? o
 
     public const int MaxPlanItems = 500;
 
+    public async Task UnlockAsync(ResticRepository repository, CancellationToken cancellationToken = default) =>
+        Ensure(repository, await RunRawAsync(repository, ["unlock"], null, cancellationToken));
+
     public async Task InitFromAsync(ResticRepository repository, ResticRepository source, CancellationToken cancellationToken = default)
     {
         if (await ExistsAsync(repository, cancellationToken))
