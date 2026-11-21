@@ -26,9 +26,35 @@ public sealed class JsonStateStore(string path) : IStateStore
         catch (JsonException)
         {
             // Not overwritten: the file may still hold passwords that the user needs.
-            throw new DomainException("state_corrupt", $"The state file {path} cannot be read. It was left as it is.");
+            string copy = File.Exists(BackupPath) ? $" A copy of the version before is in {BackupPath}." : "";
+            throw new DomainException("state_corrupt", $"The state file {path} cannot be read. It was left as it is.{copy}");
         }
     }
 
-    public void Save(AppState state) => AtomicFile.WriteAllText(path, JsonSerializer.Serialize(state, AppStateJson.Default.AppState));
+    private string BackupPath => path + ".bak";
+
+    /// <summary>
+    /// Writes the state. The file holds the passwords of the repositories, and without them the backups cannot be opened, so
+    /// the version that was there is kept as a copy first, unless it cannot be read, which would replace a good copy with a bad one.
+    /// </summary>
+    public void Save(AppState state)
+    {
+        if (File.Exists(path))
+        {
+            try
+            {
+                string previous = File.ReadAllText(path);
+                if (JsonSerializer.Deserialize(previous, AppStateJson.Default.AppState) != null)
+                {
+                    AtomicFile.WriteAllText(BackupPath, previous);
+                }
+            }
+            catch (JsonException)
+            {
+                // A file that cannot be read is not kept over a copy that can.
+            }
+        }
+
+        AtomicFile.WriteAllText(path, JsonSerializer.Serialize(state, AppStateJson.Default.AppState));
+    }
 }

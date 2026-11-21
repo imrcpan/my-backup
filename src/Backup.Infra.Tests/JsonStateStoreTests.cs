@@ -48,7 +48,8 @@ public sealed class JsonStateStoreTests : IDisposable
         JsonStateStore store = new(StatePath);
         store.Save(new AppState { Groups = [new BackupGroup { Id = "a", Name = "First" }] });
         store.Save(new AppState { Groups = [new BackupGroup { Id = "b", Name = "Second" }] });
-        Assert.Equal(["state.json"], Directory.GetFiles(Path.GetDirectoryName(StatePath)!).Select(Path.GetFileName));
+        // No temporary file is left; the copy of the version before is meant to be there.
+        Assert.Equal(["state.json", "state.json.bak"], Directory.GetFiles(Path.GetDirectoryName(StatePath)!).Select(Path.GetFileName).Order());
         Assert.Equal("Second", store.Load().Groups.Single().Name);
     }
 
@@ -115,5 +116,41 @@ public sealed class JsonStateStoreTests : IDisposable
 
         Assert.Equal("state_corrupt", Assert.Throws<DomainException>(() => new JsonStateStore(StatePath).Load()).Code);
         Assert.Equal(content, File.ReadAllText(StatePath));
+    }
+
+    [Fact]
+    public void The_version_before_is_kept_as_a_copy_with_the_same_permissions()
+    {
+        JsonStateStore store = new(StatePath);
+        store.Save(new AppState { Groups = [new BackupGroup { Id = "a", Name = "First" }] });
+        Assert.False(File.Exists(StatePath + ".bak"), "there is nothing before the first save");
+
+        store.Save(new AppState { Groups = [new BackupGroup { Id = "b", Name = "Second" }] });
+        store.Save(new AppState { Groups = [new BackupGroup { Id = "c", Name = "Third" }] });
+
+        Assert.Equal("Third", store.Load().Groups.Single().Name);
+        Assert.Contains("Second", File.ReadAllText(StatePath + ".bak"));
+        Assert.DoesNotContain("First", File.ReadAllText(StatePath + ".bak"));
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(StatePath + ".bak"));
+        }
+    }
+
+    [Fact]
+    public void A_state_file_that_cannot_be_read_does_not_replace_the_good_copy_and_the_error_points_to_it()
+    {
+        JsonStateStore store = new(StatePath);
+        store.Save(new AppState { Groups = [new BackupGroup { Id = "a", Name = "Good" }] });
+        store.Save(new AppState { Groups = [new BackupGroup { Id = "b", Name = "Newer" }] });
+        File.WriteAllText(StatePath, "{ damaged");
+
+        DomainException error = Assert.Throws<DomainException>(() => new JsonStateStore(StatePath).Load());
+        Assert.Equal("state_corrupt", error.Code);
+        Assert.Contains(StatePath + ".bak", error.Message);
+
+        store.Save(new AppState { Groups = [new BackupGroup { Id = "c", Name = "After" }] });
+        Assert.Contains("Good", File.ReadAllText(StatePath + ".bak"));
+        Assert.DoesNotContain("damaged", File.ReadAllText(StatePath + ".bak"));
     }
 }
