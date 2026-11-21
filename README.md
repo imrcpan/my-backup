@@ -45,6 +45,9 @@ confirmation.
   nothing and is continued by the next run (checked with `check --read-data`), and a stopped
   file sync leaves a half file only under a `.partial` name. A stopped restore is the one
   that could leave a file of full size and wrong content, so its output is removed.
+- When restic cannot read some files it still saves a snapshot of the rest. Such a snapshot is
+  tagged `incomplete`. It is not taken as the newest copy while a complete snapshot exists, and a
+  clean-up is never planned that would leave only incomplete snapshots in place of complete ones.
 - Removing snapshots and cleaning up a repository need an explicit
   acknowledgement, and remove exactly what the plan listed.
 - Passwords and tokens are masked in every log. They reach restic through its
@@ -52,6 +55,14 @@ confirmation.
   with an argument list, never through a shell.
 - The server listens on localhost only and refuses other hosts and foreign
   origins.
+
+## Passwords
+
+The password of an encrypted object is saved in `state.json` in the data directory (readable by
+the owner only), so it is not asked again. **Without the password the backups cannot be opened.**
+Keep a copy somewhere else. Before each save the version before is kept as `state.json.bak`.
+
+Only one instance can use a data directory; a second one refuses to start.
 
 ## Requirements
 
@@ -96,6 +107,10 @@ Settings are read from the command line or the environment:
 | `ResticPath`   | the restic program                                   | `restic`                           |
 | `RclonePath`   | the rclone program                                   | `rclone`                           |
 | `RcloneConfig` | an rclone config file                                | the default one of rclone          |
+
+The program ends with a sentence and an exit code if it cannot start: `2` the port is not a
+number, `3` the data directory is used by another instance or cannot be used, or the state file
+cannot be read (it is left as it is), `4` the port is in use.
 
 For work on the interface alone, `pnpm dev` in `src/web` serves it with hot reload and
 sends `/api` to a server that is already running on port 1580.
