@@ -39,7 +39,15 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
   }
   if (response.status === 204) return undefined as T
   const text = await response.text()
-  const data: unknown = text ? JSON.parse(text) : undefined
+  let data: unknown
+  try {
+    data = text ? JSON.parse(text) : undefined
+  } catch {
+    // Not JSON, for example the page of a proxy that could not reach the server: show what it said.
+    if (!response.ok)
+      throw new ApiError('unexpected', text.trim().slice(0, 300) || response.statusText, response.status)
+    throw new ApiError('unexpected', 'The server sent something that is not JSON.', response.status)
+  }
   if (!response.ok) {
     const error = (data ?? {}) as { code?: string; message?: string }
     throw new ApiError(error.code ?? 'unexpected', error.message ?? response.statusText, response.status)

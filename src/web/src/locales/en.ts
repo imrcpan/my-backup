@@ -33,7 +33,7 @@ export const en = {
   'common.yes': 'Yes',
   'common.no': 'No',
   'error.network': 'The server cannot be reached.',
-  'error.unexpected': 'Something went wrong. See the log of the application.',
+  'error.unexpected': 'Unexpected error:',
   'error.path_invalid': 'The path must be absolute, start with “/” and not contain “..”.',
   'error.path_not_found': 'The directory does not exist.',
   'error.device_id_invalid': 'The id must be 1–32 characters of a–z, 0–9, “_” or “-”.',

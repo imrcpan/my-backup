@@ -9,6 +9,8 @@ export function useNotify() {
   /** The text for an error: the translation of its code, or what the server said. */
   const describe = (error: unknown): string => {
     if (error instanceof ApiError) {
+      // An error that nobody planned for has no translation; its message says what it was.
+      if (error.code === 'unexpected') return `${t('error.unexpected')} ${error.message}`
       const key = `error.${error.code}`
       return has(key) ? t(key) : error.message
     }
@@ -17,6 +19,7 @@ export function useNotify() {
 
   /** The text for an error code that came inside a run, with the message of the server as the fallback. */
   const describeCode = (code: string | undefined, message: string | undefined): string => {
+    if (code === 'unexpected') return `${t('error.unexpected')} ${message ?? ''}`.trim()
     const key = `error.${code}`
     return code && has(key) ? t(key) : (message ?? t('error.unexpected'))
   }

@@ -1,5 +1,6 @@
 using Backup.Core;
 using Backup.Infra;
+using Backup.Infra.Logging;
 
 namespace Backup.Server.Api;
 
@@ -27,9 +28,17 @@ public static class ErrorMapping
         catch (Exception error) when (error is not OperationCanceledException)
         {
             app.Logger.LogError(error, "{Method} {Path} failed unexpectedly.", context.Request.Method, context.Request.Path);
-            await Write(context, StatusCodes.Status500InternalServerError, new ApiError("unexpected", "Something went wrong. See the log of the application."));
+            // The person using the application sees what went wrong, not a request to read a log. Saved passwords are masked.
+            await Write(context, StatusCodes.Status500InternalServerError, new ApiError("unexpected", Describe(app, error)));
         }
     });
+
+    private static string Describe(WebApplication app, Exception error)
+    {
+        SecretRedactor redactor = new(app.Services.GetRequiredService<Workspace>()
+            .Read((_, groups) => groups.Groups.SelectMany(g => g.Objects.Select(o => o.Password)).ToArray()));
+        return redactor.Redact($"{error.GetType().Name}: {error.Message}");
+    }
 
     internal static int StatusOf(string code) => code switch
     {

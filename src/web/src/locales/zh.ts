@@ -35,7 +35,7 @@ export const zh: Record<keyof typeof en, string> = {
   'common.yes': '是',
   'common.no': '否',
   'error.network': '无法连接到服务。',
-  'error.unexpected': '出了点问题，请查看应用日志。',
+  'error.unexpected': '意外错误：',
   'error.path_invalid': '路径必须是以“/”开头的绝对路径，且不能包含“..”。',
   'error.path_not_found': '目录不存在。',
   'error.device_id_invalid': 'id 必须是 1–32 个字符，只能用 a–z、0–9、“_”、“-”。',
