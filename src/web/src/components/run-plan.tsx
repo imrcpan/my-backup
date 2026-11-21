@@ -11,7 +11,7 @@ import type { PlanLine, Run, RunStep } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 /** The note keys that are warnings about data being lost or a lot being read. */
-const dangerous = new Set(['deletes_in_target', 'irreversible'])
+const dangerous = new Set(['deletes_in_target', 'irreversible', 'partial_output_left'])
 
 const symbol: Record<string, { mark: string; tone: string }> = {
   new: { mark: '+', tone: 'text-emerald-600 dark:text-emerald-400' },

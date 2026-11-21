@@ -38,6 +38,13 @@ confirmation.
 - Removing a group, an object or a device only forgets the configuration. No
   repository and no file is deleted.
 - A restore goes only into a new or empty folder and never over existing files.
+- Cancelling a run stops the program the way Ctrl+C does, so restic and rclone release their
+  locks and remove their half-written files; a program that does not stop in time is killed.
+  What earlier steps finished stays as it is. The step that was going leaves nothing that the
+  next run cannot finish: a stopped restic backup, copy or prune makes no snapshot, damages
+  nothing and is continued by the next run (checked with `check --read-data`), and a stopped
+  file sync leaves a half file only under a `.partial` name. A stopped restore is the one
+  that could leave a file of full size and wrong content, so its output is removed.
 - Removing snapshots and cleaning up a repository need an explicit
   acknowledgement, and remove exactly what the plan listed.
 - Passwords and tokens are masked in every log. They reach restic through its
