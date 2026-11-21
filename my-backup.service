@@ -1,6 +1,6 @@
 # Backup Manager as a systemd service.
 #
-#   sudo cp my-backup.service /etc/systemd/system/
+#   sed "s/YOUR_USER/$USER/" my-backup.service | sudo tee /etc/systemd/system/my-backup.service
 #   sudo systemctl daemon-reload
 #   sudo systemctl enable --now my-backup
 #
@@ -11,7 +11,8 @@
 #   cd src/web && pnpm build && cd ..
 #   dotnet publish Backup.Server -c Release -r linux-x64 -o /opt/my-backup
 #
-# Change User= to the account whose files are backed up. It owns the data directory
+# YOUR_USER stands for the account whose files are backed up; the sed above puts your own in its place.
+# Its primary group is used as the group. The account owns the data directory
 # (~/.local/share/backup-manager: state, passwords, run history) and the rclone config
 # (~/.config/rclone/rclone.conf), so run "rclone config" or sign in to Google as that user.
 # restic and rclone must be installed and be found in PATH.
@@ -24,8 +25,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=prc
-Group=prc
+User=YOUR_USER
 
 # The web interface is read from ./wwwroot next to the program, so this must be the folder of the program.
 WorkingDirectory=/opt/my-backup

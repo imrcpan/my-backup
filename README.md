@@ -141,14 +141,15 @@ sudo tar -xzf my_backup_linux_1.0_x64.tar.gz -C /opt      # makes /opt/my-backup
 
 ## Run it as a service (systemd)
 
-`my-backup.service` can be copied as it is. It runs the published program from `/opt/my-backup` on
-port 1582 as the user `prc`; change `User=`, `Group=` and the paths in it if yours differ.
+`my-backup.service` runs the published program from `/opt/my-backup` on port 1582. `YOUR_USER` in it
+stands for the account whose files are backed up, and the command below puts your own account there;
+change the port or the paths in the file if yours differ.
 
 ```sh
 cd src/web && pnpm build && cd ..
 sudo dotnet publish Backup.Server -c Release -r linux-x64 -o /opt/my-backup   # the interface is read from ./wwwroot there
 # (or unpack a release into /opt, see above)
-sudo cp ../my-backup.service /etc/systemd/system/
+sed "s/YOUR_USER/$USER/" ../my-backup.service | sudo tee /etc/systemd/system/my-backup.service >/dev/null
 sudo systemctl daemon-reload
 sudo systemctl enable --now my-backup          # then open http://localhost:1582
 ```
