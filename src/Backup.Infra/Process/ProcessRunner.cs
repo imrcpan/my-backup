@@ -1,12 +1,23 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Backup.Infra.Process;
 
-public sealed class ProcessRunner : IProcessRunner
+/// <param name="gracePeriod">
+/// How long a program that is asked to stop (with SIGINT, as Ctrl+C does) may take to finish by itself,
+/// before it and its children are killed. restic and rclone use it to release their locks and to remove
+/// the files they have only half written; a kill leaves those behind.
+/// </param>
+public sealed partial class ProcessRunner(TimeSpan? gracePeriod = null) : IProcessRunner
 {
     private const int MaxErrorCharacters = 32 * 1024;
+    private const int SigInt = 2;
+    private readonly TimeSpan _gracePeriod = gracePeriod ?? TimeSpan.FromSeconds(20);
+
+    [LibraryImport("libc", EntryPoint = "kill", SetLastError = true)]
+    private static partial int SendSignal(int processId, int signal);
 
     public async Task<ProcessResult> RunAsync(
         ProcessSpec spec,
@@ -55,7 +66,8 @@ public sealed class ProcessRunner : IProcessRunner
             throw new ExternalToolException("tool_not_started", $"The program '{spec.FileName}' could not be started.");
         }
 
-        using CancellationTokenRegistration kill = cancellationToken.Register(() => Kill(process));
+        using CancellationTokenSource exited = new();
+        using CancellationTokenRegistration stop = cancellationToken.Register(() => Stop(process, exited.Token));
 
         StringBuilder output = new();
         Queue<string> errorLines = new();
@@ -96,6 +108,7 @@ public sealed class ProcessRunner : IProcessRunner
         }
 
         await process.WaitForExitAsync(CancellationToken.None);
+        await exited.CancelAsync();
         await Task.WhenAll(outputTask, errorTask);
         cancellationToken.ThrowIfCancellationRequested();
         return new ProcessResult(process.ExitCode, output.ToString(), string.Join('\n', errorLines));
@@ -107,6 +120,42 @@ public sealed class ProcessRunner : IProcessRunner
         {
             onLine(line);
         }
+    }
+
+    /// <summary>Asks the program to stop as Ctrl+C does, and kills it with its children if it has not ended in time.</summary>
+    private void Stop(System.Diagnostics.Process process, CancellationToken ended)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Kill(process);
+            return;
+        }
+
+        try
+        {
+            if (SendSignal(process.Id, SigInt) != 0)
+            {
+                Kill(process);
+                return;
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            return; // Already finished.
+        }
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(_gracePeriod, ended);
+                Kill(process);
+            }
+            catch (OperationCanceledException)
+            {
+                // It ended by itself.
+            }
+        }, CancellationToken.None);
     }
 
     private static void Kill(System.Diagnostics.Process process)

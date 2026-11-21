@@ -87,4 +87,50 @@ public class ProcessRunnerTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => _runner.RunAsync(new("sleep", ["60"]), cancellationToken: cancel.Token));
     }
+
+    [Fact]
+    public async Task Cancel_first_asks_the_program_to_stop_so_that_it_can_clean_up()
+    {
+        // A program that cleans up when it is interrupted, as restic and rclone do.
+        List<string> lines = [];
+        using CancellationTokenSource cancel = new();
+        Task<ProcessResult> run = _runner.RunAsync(
+            new("sh", ["-c", "trap 'echo cleaned-up; exit 130' INT; echo ready; sleep 60 & wait"]),
+            line =>
+            {
+                lines.Add(line);
+                if (line == "ready")
+                {
+                    cancel.Cancel();
+                }
+            },
+            cancellationToken: cancel.Token);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
+
+        Assert.Contains("cleaned-up", lines);
+    }
+
+    [Fact]
+    public async Task A_program_that_ignores_the_request_is_killed_after_the_grace_period()
+    {
+        ProcessRunner patient = new(TimeSpan.FromMilliseconds(400));
+        using CancellationTokenSource cancel = new();
+        Task<ProcessResult> run = patient.RunAsync(
+            new("sh", ["-c", "trap '' INT; echo ready; sleep 60"]),
+            line =>
+            {
+                if (line == "ready")
+                {
+                    cancel.Cancel();
+                }
+            },
+            cancellationToken: cancel.Token);
+
+        DateTime start = DateTime.UtcNow;
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
+
+        TimeSpan took = DateTime.UtcNow - start;
+        Assert.InRange(took, TimeSpan.FromMilliseconds(300), TimeSpan.FromSeconds(10));
+    }
 }
