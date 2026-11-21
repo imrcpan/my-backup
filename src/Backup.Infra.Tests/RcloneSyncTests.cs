@@ -142,4 +142,50 @@ public sealed class RcloneSyncTests : IDisposable
         Assert.Equal(["--max-delete", "7"], args.SkipWhile(a => a != "--max-delete").Take(2));
         Assert.Equal(["--", "/a", "/b"], args[^3..]);
     }
+
+    [Fact]
+    public async Task The_deletions_come_first_in_the_plan_and_the_whole_list_is_kept_with_the_bytes_of_each_kind()
+    {
+        Put(_a, "zeta.txt", "123456");
+        Put(_a, "alpha/one.txt", "12");
+        Put(_a, "beta.txt", "12345678");
+        Put(_b, "stale-z.txt", "123");
+        Put(_b, "stale-a.txt", "1234567");
+
+        RcloneSyncPlan plan = await _client.PlanSyncAsync(_a, _b, Ct);
+
+        Assert.Equal(["delete:stale-a.txt", "delete:stale-z.txt", "copy:alpha/one.txt", "copy:beta.txt", "copy:zeta.txt"],
+            plan.Items.Select(i => $"{i.Action}:{i.Path}"));
+        Assert.Equal(plan.Items, plan.AllItems);
+        Assert.False(plan.ItemsTruncated);
+        Assert.False(plan.AllItemsTruncated);
+        Assert.Equal(2 + 8 + 6, plan.BytesToCopy);
+        Assert.Equal(3 + 7, plan.BytesToDelete);
+        Assert.Equal(2, plan.DeleteCount);
+        Assert.Equal(3, plan.CopyCount);
+    }
+
+    [Fact]
+    public async Task When_the_list_is_cut_the_deletions_are_what_stays_and_the_whole_list_is_longer()
+    {
+        RecordingRunner runner = new();
+        List<string> lines = [];
+        for (int i = 0; i < RcloneClient.MaxPlanItems + 40; i++)
+        {
+            lines.Add($$"""{"skipped":"copy","size":1,"object":"c{{i:D5}}"}""");
+        }
+
+        lines.Add("""{"skipped":"delete","size":9,"object":"gone.txt"}""");
+        runner.Answer(0, "", string.Join('\n', lines));
+
+        RcloneSyncPlan plan = await new RcloneClient(runner).PlanSyncAsync("/a", "/b", Ct);
+
+        Assert.Equal("delete", plan.Items[0].Action);
+        Assert.Equal("gone.txt", plan.Items[0].Path);
+        Assert.Equal(RcloneClient.MaxPlanItems, plan.Items.Count);
+        Assert.True(plan.ItemsTruncated);
+        Assert.Equal(RcloneClient.MaxPlanItems + 41, plan.AllItems.Count);
+        Assert.False(plan.AllItemsTruncated);
+        Assert.Equal(9, plan.BytesToDelete);
+    }
 }

@@ -30,12 +30,17 @@ internal sealed record RcloneJsonEntry(string Name, bool IsDir);
 public sealed record RcloneSyncItem(string Action, string Path, long Size);
 
 /// <summary>What a sync would do to the target. Nothing is changed by making this.</summary>
+/// <param name="Items">The first <see cref="RcloneClient.MaxPlanItems"/> of <paramref name="AllItems"/>: the deletions come first, as they matter most.</param>
+/// <param name="AllItems">Every deletion and then every copy, each group by path; cut at <see cref="RcloneClient.MaxDiffItems"/>.</param>
 public sealed record RcloneSyncPlan(
     long CopyCount,
     long DeleteCount,
     long BytesToCopy,
     IReadOnlyList<RcloneSyncItem> Items,
-    bool ItemsTruncated);
+    bool ItemsTruncated,
+    long BytesToDelete,
+    IReadOnlyList<RcloneSyncItem> AllItems,
+    bool AllItemsTruncated);
 
 public sealed record RcloneSyncProgress(long Bytes, long TotalBytes, long Transfers, long TotalTransfers);
 
@@ -119,12 +124,15 @@ public sealed partial class RcloneClient(IProcessRunner runner, RcloneOptions? o
 
     public const int MaxPlanItems = 500;
 
+    /// <summary>How many entries of a plan are kept whole, for the complete diff that the user can download.</summary>
+    public const int MaxDiffItems = 1_000_000;
+
     public async Task<RcloneSyncPlan> PlanSyncAsync(string source, string target, CancellationToken cancellationToken = default)
     {
         ValidateLocation(source);
         ValidateLocation(target);
-        List<RcloneSyncItem> items = [];
-        long copies = 0, deletes = 0, bytes = 0;
+        List<RcloneSyncItem> copyItems = [], deleteItems = [];
+        long copies = 0, deletes = 0, bytes = 0, deletedBytes = 0;
         ProcessResult result = await RunAsync(
             ["sync", "--dry-run", "--use-json-log", "-v", "--stats", "0", "--", source, target],
             null,
@@ -140,19 +148,29 @@ public sealed partial class RcloneClient(IProcessRunner runner, RcloneOptions? o
                 {
                     copies++;
                     bytes += size;
+                    if (copyItems.Count < MaxDiffItems)
+                    {
+                        copyItems.Add(new RcloneSyncItem(action, path, size));
+                    }
                 }
                 else
                 {
                     deletes++;
-                }
-
-                if (items.Count < MaxPlanItems)
-                {
-                    items.Add(new RcloneSyncItem(action, path, size));
+                    deletedBytes += size;
+                    if (deleteItems.Count < MaxDiffItems)
+                    {
+                        deleteItems.Add(new RcloneSyncItem(action, path, size));
+                    }
                 }
             });
         Ensure(result);
-        return new RcloneSyncPlan(copies, deletes, bytes, items, copies + deletes > items.Count);
+
+        // What is deleted is shown first, and in a fixed order, whatever the order in which rclone found it.
+        deleteItems.Sort((a, b) => string.CompareOrdinal(a.Path, b.Path));
+        copyItems.Sort((a, b) => string.CompareOrdinal(a.Path, b.Path));
+        List<RcloneSyncItem> all = [.. deleteItems.Concat(copyItems).Take(MaxDiffItems)];
+        List<RcloneSyncItem> first = [.. all.Take(MaxPlanItems)];
+        return new RcloneSyncPlan(copies, deletes, bytes, first, copies + deletes > first.Count, deletedBytes, all, copies + deletes > all.Count);
     }
 
     public async Task SyncAsync(string source, string target, long maxDeletes, Action<RcloneSyncProgress>? onProgress = null, CancellationToken cancellationToken = default)
