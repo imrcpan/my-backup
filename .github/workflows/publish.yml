@@ -90,18 +90,23 @@ jobs:
       - name: Tools to cross-compile for arm64
         if: matrix.arch == 'arm64'
         run: |
+          # The arm64 packages must come from the same release of Ubuntu as the amd64 ones of the machine: zlib1g-dev needs
+          # the same version for both architectures, so the release is read here and is not written into this file.
+          codename="$(. /etc/os-release && echo "$VERSION_CODENAME")"
+          echo "Ubuntu $codename"
           sudo dpkg --add-architecture arm64
-          # The packages of the machine come from the usual mirror for amd64 only; those of arm64 come from ports.ubuntu.com.
+          # The mirror of the machine is for amd64 only; the packages of arm64 come from ports.ubuntu.com.
           sudo sed -i '/^Types: deb$/a Architectures: amd64' /etc/apt/sources.list.d/ubuntu.sources
-          sudo tee /etc/apt/sources.list.d/ubuntu-arm64.sources >/dev/null <<'EOF'
+          sudo tee /etc/apt/sources.list.d/ubuntu-arm64.sources >/dev/null <<EOF
           Types: deb
           URIs: http://ports.ubuntu.com/ubuntu-ports
-          Suites: noble noble-updates noble-security
+          Suites: $codename $codename-updates $codename-security
           Components: main universe
           Architectures: arm64
           Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
           EOF
           sudo apt-get update
+          apt-cache policy zlib1g:amd64 zlib1g:arm64 | grep -E "zlib1g|Candidate"
           sudo apt-get install -y clang llvm binutils-aarch64-linux-gnu gcc-aarch64-linux-gnu zlib1g-dev:arm64
 
       - name: Build the web interface
