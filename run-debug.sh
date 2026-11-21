@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Starts the backend (Debug build, JIT) and the web interface (Vite dev server with hot reload).
-# Press Ctrl+C to stop both.
+# Starts the backend (Debug build, JIT), which also serves the web interface, on one port:
 #
-#   backend  http://localhost:5174   (the API)
-#   web      http://localhost:5173   (open this one; it sends /api to the backend)
+#   http://localhost:1580
+#
+# The interface is built first and then rebuilt whenever a file of src/web changes; reload
+# the page to see a change. Press Ctrl+C to stop everything.
 #
 # Extra arguments go to the backend, for example: ./run-debug.sh --DataDir=/tmp/backup-data
 set -euo pipefail
@@ -33,12 +34,15 @@ if [ ! -d src/web/node_modules ]; then
   (cd src/web && pnpm install)
 fi
 
-echo "Starting the backend on http://localhost:5174 ..."
-setsid dotnet run --project src/Backup.Server --configuration Debug --no-launch-profile -- --Port=5174 "$@" &
+echo "Building the web interface..."
+(cd src/web && pnpm exec vite build)
+
+echo "Watching the web interface for changes..."
+(cd src/web && exec setsid pnpm exec vite build --watch) &
 pids+=("$!")
 
-echo "Starting the web interface on http://localhost:5173 ..."
-(cd src/web && exec setsid pnpm exec vite --host localhost --port 5173 --strictPort) &
+echo "Starting the backend on http://localhost:1580 ..."
+setsid dotnet run --project src/Backup.Server --configuration Debug --no-launch-profile -- "$@" &
 pids+=("$!")
 
 # Ends as soon as either one stops, or on Ctrl+C.

@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 using Backup.Server.Api;
 
 WebApplicationBuilder builder = WebApplication.CreateSlimBuilder(args);
-builder.WebHost.ConfigureKestrel(kestrel => kestrel.ListenLocalhost(builder.Configuration.GetValue("Port", 5174)));
+builder.WebHost.ConfigureKestrel(kestrel => kestrel.ListenLocalhost(builder.Configuration.GetValue("Port", 1580)));
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.TypeInfoResolverChain.Insert(0, ApiJson.Default);

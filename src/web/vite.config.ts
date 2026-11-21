@@ -8,5 +8,5 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },
   build: { outDir: '../Backup.Server/wwwroot', emptyOutDir: true },
-  server: { proxy: { '/api': 'http://localhost:5174' } },
+  server: { proxy: { '/api': 'http://localhost:1580' } },
 })

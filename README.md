@@ -58,8 +58,9 @@ For Google Drive, add a cloud device (or use the built-in one) and choose
 
 Development and tests use the JIT; nothing needs to be published.
 
-One command starts the backend (Debug, JIT) and the interface with hot reload;
-open http://localhost:5173 and press Ctrl+C to stop both:
+One command builds the interface and starts the backend (Debug, JIT);
+the backend serves the interface on the same port, http://localhost:1580. The interface is
+rebuilt when a file changes (reload the page). Press Ctrl+C to stop everything:
 
 ```sh
 ./run-debug.sh                      # extra arguments go to the backend, e.g. --DataDir=/tmp/data
@@ -73,7 +74,7 @@ cd src/web
 pnpm install
 pnpm build            # writes into src/Backup.Server/wwwroot
 
-# the server, on http://localhost:5174
+# the server, with the interface, on http://localhost:1580
 cd ..
 dotnet run --project Backup.Server
 ```
@@ -82,14 +83,14 @@ Settings are read from the command line or the environment:
 
 | setting        | meaning                                              | default                            |
 | -------------- | ---------------------------------------------------- | ---------------------------------- |
-| `Port`         | port of the server                                   | `5174`                             |
+| `Port`         | port of the server and of the interface              | `1580`                             |
 | `DataDir`      | state, run history and logs                          | `~/.local/share/backup-manager`    |
 | `ResticPath`   | the restic program                                   | `restic`                           |
 | `RclonePath`   | the rclone program                                   | `rclone`                           |
 | `RcloneConfig` | an rclone config file                                | the default one of rclone          |
 
 For the interface alone, `pnpm dev` in `src/web` serves it with hot reload and
-sends `/api` to the server on port 5174.
+sends `/api` to the server on port 1580.
 
 ## Release (Native AOT)
 
