@@ -263,4 +263,23 @@ public class RunTests
         Assert.Equal(RunState.Planned, catalog.Find(recent.Id)!.State);
         Assert.Equal("run_not_planned", CodeOf(() => discarded.EnsureCanStart(Now.AddMinutes(45), true)));
     }
+
+    [Fact]
+    public void A_copy_of_a_step_keeps_the_size_of_the_deletions_and_whether_there_is_a_diff_but_not_the_whole_list()
+    {
+        RunStep step = new()
+        {
+            Id = "s",
+            Kind = StepKind.FileSync,
+            BytesToDelete = 139,
+            HasDiff = true,
+            CompleteDiff = [new PlanLine { Action = "delete", Path = "/x", Size = 1 }],
+        };
+
+        RunStep copy = step.Clone();
+
+        Assert.Equal(139, copy.BytesToDelete);
+        Assert.True(copy.HasDiff);
+        Assert.Null(copy.CompleteDiff);
+    }
 }

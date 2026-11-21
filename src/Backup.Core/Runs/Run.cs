@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Backup.Core.Runs;
 
 public enum RunKind
@@ -149,6 +151,19 @@ public sealed class RunStep
 
     public long Bytes { get; set; }
 
+    /// <summary>The bytes of the files that the step deletes; <see cref="Bytes"/> is what it copies or uploads.</summary>
+    public long BytesToDelete { get; set; }
+
+    /// <summary>Whether the whole list of what the step does was kept, to be downloaded; the lines above are only the start of it.</summary>
+    public bool HasDiff { get; set; }
+
+    /// <summary>
+    /// The whole list, only while the plan is being made: the planner leaves it here and the service that registers the
+    /// plan writes it to a file and clears it. It is never saved with the run, copied, or sent to the interface.
+    /// </summary>
+    [JsonIgnore]
+    public IReadOnlyList<PlanLine>? CompleteDiff { get; set; }
+
     /// <summary>Stable keys the interface turns into text, such as "creates_repository".</summary>
     public List<string> Notes { get; set; } = [];
 
@@ -174,6 +189,8 @@ public sealed class RunStep
         ToChange = ToChange,
         ToDelete = ToDelete,
         Bytes = Bytes,
+        BytesToDelete = BytesToDelete,
+        HasDiff = HasDiff,
         Notes = [.. Notes],
         Progress = Progress,
         BytesDone = BytesDone,

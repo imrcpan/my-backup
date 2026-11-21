@@ -61,4 +61,23 @@ public sealed class JsonRunStoreTests : IDisposable
         Assert.Equal("state_corrupt", Assert.Throws<DomainException>(() => new JsonRunStore(RunsPath).Load()).Code);
         Assert.Equal("[{ broken", File.ReadAllText(RunsPath));
     }
+
+    [Fact]
+    public void The_whole_diff_is_not_saved_with_the_run_but_the_fact_that_there_is_one_is()
+    {
+        Run run = new()
+        {
+            Id = "r1",
+            State = RunState.Planned,
+            Steps = [new RunStep { Id = "s1", HasDiff = true, BytesToDelete = 42, CompleteDiff = [new PlanLine { Action = "delete", Path = "/secret-name.txt" }] }],
+        };
+
+        new JsonRunStore(RunsPath).Save([run]);
+
+        Assert.DoesNotContain("secret-name.txt", File.ReadAllText(RunsPath));
+        RunStep back = new JsonRunStore(RunsPath).Load().Single().Steps.Single();
+        Assert.True(back.HasDiff);
+        Assert.Equal(42, back.BytesToDelete);
+        Assert.Null(back.CompleteDiff);
+    }
 }
