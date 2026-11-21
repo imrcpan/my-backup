@@ -58,6 +58,15 @@ For Google Drive, add a cloud device (or use the built-in one) and choose
 
 Development and tests use the JIT; nothing needs to be published.
 
+One command starts the backend (Debug, JIT) and the interface with hot reload;
+open http://localhost:5173 and press Ctrl+C to stop both:
+
+```sh
+./run-debug.sh                      # extra arguments go to the backend, e.g. --DataDir=/tmp/data
+```
+
+Or step by step:
+
 ```sh
 # the interface
 cd src/web
