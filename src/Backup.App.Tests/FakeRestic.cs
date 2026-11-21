@@ -1,4 +1,5 @@
 using Backup.Core;
+using Backup.Infra;
 using Backup.Infra.Restic;
 
 namespace Backup.App.Tests;
@@ -20,8 +21,15 @@ public sealed class FakeRestic : IResticClient
 
     public List<(string Snapshot, string Tag)> Tagged { get; } = [];
 
+    public bool TagFails { get; set; }
+
     public Task TagAsync(ResticRepository repository, string snapshotId, string tag, CancellationToken cancellationToken = default)
     {
+        if (TagFails)
+        {
+            throw new ExternalToolException("restic_failed", "cannot tag");
+        }
+
         Tagged.Add((snapshotId, tag));
         return Task.CompletedTask;
     }

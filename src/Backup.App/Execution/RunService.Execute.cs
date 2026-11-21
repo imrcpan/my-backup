@@ -188,6 +188,19 @@ public sealed partial class RunService
                         {
                             Line("Not saved: " + error);
                         }
+
+                        // restic saves the snapshot of what it could read as if it were whole. Marked, it is not taken
+                        // for a complete copy when the newest one is chosen, and a clean-up never leaves it alone in the repository.
+                        try
+                        {
+                            await restic.TagAsync(repository, summary.SnapshotId, ResticSnapshot.IncompleteTag, cancellationToken);
+                            Line("The snapshot is marked as incomplete.");
+                        }
+                        catch (ExternalToolException error)
+                        {
+                            runs.Update(runId, _ => step.Notes.Add("incomplete_not_marked"));
+                            Line("The snapshot could not be marked as incomplete: " + error.Message);
+                        }
                     }
 
                     break;

@@ -177,6 +177,25 @@ public sealed class RunServiceControlTests : IDisposable
         Assert.Equal(RunState.Succeeded, run.State);
         Assert.Contains("backup_incomplete", run.Steps[0].Notes);
         Assert.Contains(_fx.Log.Tail(plan.Id, 50), l => l.Contains("Not saved: /s/secret"));
+        Assert.Equal([("0123456789abcdef", "incomplete")], _restic.Tagged);
+        Assert.DoesNotContain("incomplete_not_marked", run.Steps[0].Notes);
+    }
+
+    [Fact]
+    public async Task A_whole_backup_is_not_marked_and_a_marking_that_fails_is_a_note_and_not_a_failed_run()
+    {
+        _restic.OnBackup = (_, _, _, _) => Task.FromResult(Summary());
+        Run whole = await _fx.RunToEnd(await _fx.PlanSync(_source, _first));
+        Assert.Equal(RunState.Succeeded, whole.State);
+        Assert.Empty(_restic.Tagged);
+
+        _restic.OnBackup = (_, _, _, _) => Task.FromResult(Summary(true, "/s/x: input/output error"));
+        _restic.TagFails = true;
+        Run run = await _fx.RunToEnd(await _fx.PlanSync(_source, _first));
+
+        Assert.Equal(RunState.Succeeded, run.State);
+        Assert.Contains("backup_incomplete", run.Steps[0].Notes);
+        Assert.Contains("incomplete_not_marked", run.Steps[0].Notes);
     }
 
     [Fact]
