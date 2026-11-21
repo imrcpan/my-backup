@@ -58,9 +58,10 @@ For Google Drive, add a cloud device (or use the built-in one) and choose
 
 Development and tests use the JIT; nothing needs to be published.
 
-One command builds the interface and starts the backend (Debug, JIT);
-the backend serves the interface on the same port, http://localhost:1580. The interface is
-rebuilt when a file changes (reload the page). Press Ctrl+C to stop everything:
+One command builds the interface as static files, as for a release, and starts the
+backend (Debug, JIT), which serves them on the same port, http://localhost:1580. Only the
+backend is a debug build, and there is no hot reload: after a change in `src/web`, run it
+again. Press Ctrl+C to stop:
 
 ```sh
 ./run-debug.sh                      # arguments go to the backend, e.g. -p 8080 --DataDir=/tmp/data
@@ -89,8 +90,8 @@ Settings are read from the command line or the environment:
 | `RclonePath`   | the rclone program                                   | `rclone`                           |
 | `RcloneConfig` | an rclone config file                                | the default one of rclone          |
 
-For the interface alone, `pnpm dev` in `src/web` serves it with hot reload and
-sends `/api` to the server on port 1580.
+For work on the interface alone, `pnpm dev` in `src/web` serves it with hot reload and
+sends `/api` to a server that is already running on port 1580.
 
 ## Release (Native AOT)
 

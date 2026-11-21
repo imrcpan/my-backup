@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Starts the backend (Debug build, JIT), which also serves the web interface, on one port:
+# Builds the web interface once, as static files exactly as for a release, and starts the
+# backend (Debug build, JIT), which serves them, on one port:
 #
 #   http://localhost:1580
 #
-# The interface is built first and then rebuilt whenever a file of src/web changes; reload
-# the page to see a change. Press Ctrl+C to stop everything.
+# Only the backend is a debug build. The interface is not rebuilt while it runs: after a
+# change in src/web, run this script again. Press Ctrl+C to stop.
 #
 # Arguments go to the backend: -p 1234 or --port 1234 (default 1580) chooses the port,
 # for example: ./run-debug.sh -p 8080 --DataDir=/tmp/backup-data
@@ -48,13 +49,9 @@ fi
 echo "Building the web interface..."
 (cd src/web && pnpm exec vite build)
 
-echo "Watching the web interface for changes..."
-(cd src/web && exec setsid pnpm exec vite build --watch) &
-pids+=("$!")
-
 echo "Starting the backend on http://localhost:$port ..."
 setsid dotnet run --project src/Backup.Server --configuration Debug --no-launch-profile -- "$@" &
 pids+=("$!")
 
-# Ends as soon as either one stops, or on Ctrl+C.
-wait -n "${pids[@]}" || true
+# Runs until the backend stops, or on Ctrl+C.
+wait "${pids[@]}" || true
