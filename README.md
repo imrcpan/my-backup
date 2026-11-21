@@ -63,7 +63,7 @@ the backend serves the interface on the same port, http://localhost:1580. The in
 rebuilt when a file changes (reload the page). Press Ctrl+C to stop everything:
 
 ```sh
-./run-debug.sh                      # extra arguments go to the backend, e.g. --DataDir=/tmp/data
+./run-debug.sh                      # arguments go to the backend, e.g. -p 8080 --DataDir=/tmp/data
 ```
 
 Or step by step:
@@ -83,7 +83,7 @@ Settings are read from the command line or the environment:
 
 | setting        | meaning                                              | default                            |
 | -------------- | ---------------------------------------------------- | ---------------------------------- |
-| `Port`         | port of the server and of the interface              | `1580`                             |
+| `Port`         | port of the server and of the interface; also `-p 1234` or `--port 1234` | `1580`          |
 | `DataDir`      | state, run history and logs                          | `~/.local/share/backup-manager`    |
 | `ResticPath`   | the restic program                                   | `restic`                           |
 | `RclonePath`   | the rclone program                                   | `rclone`                           |

@@ -3,8 +3,14 @@ using Backup.Server;
 using System.Text.Json.Serialization;
 using Backup.Server.Api;
 
-WebApplicationBuilder builder = WebApplication.CreateSlimBuilder(args);
-builder.WebHost.ConfigureKestrel(kestrel => kestrel.ListenLocalhost(builder.Configuration.GetValue("Port", 1580)));
+WebApplicationBuilder builder = WebApplication.CreateSlimBuilder(CommandLine.Normalize(args));
+if (!CommandLine.TryGetPort(builder.Configuration["Port"], 1580, out int port, out string? portError))
+{
+    Console.Error.WriteLine(portError);
+    return 2;
+}
+
+builder.WebHost.ConfigureKestrel(kestrel => kestrel.ListenLocalhost(port));
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.TypeInfoResolverChain.Insert(0, ApiJson.Default);
@@ -29,6 +35,7 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 app.MapFallbackToFile("index.html");
 app.Run();
+return 0;
 
 /// <summary>Lets the tests start the server in memory.</summary>
 public partial class Program;
