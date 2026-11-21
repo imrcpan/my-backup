@@ -18,6 +18,14 @@ public sealed class FakeRestic : IResticClient
 
     public List<string> Unlocked { get; } = [];
 
+    public List<(string Snapshot, string Tag)> Tagged { get; } = [];
+
+    public Task TagAsync(ResticRepository repository, string snapshotId, string tag, CancellationToken cancellationToken = default)
+    {
+        Tagged.Add((snapshotId, tag));
+        return Task.CompletedTask;
+    }
+
     public Task UnlockAsync(ResticRepository repository, CancellationToken cancellationToken = default)
     {
         Unlocked.Add(repository.Location);

@@ -72,4 +72,7 @@ public interface IResticClient
     /// and recent locks of other computers, are kept: restic decides which are stale.
     /// </summary>
     Task UnlockAsync(ResticRepository repository, CancellationToken cancellationToken = default);
+
+    /// <summary>Adds a tag to a snapshot. The data of the snapshot is not changed.</summary>
+    Task TagAsync(ResticRepository repository, string snapshotId, string tag, CancellationToken cancellationToken = default);
 }

@@ -20,6 +20,11 @@ public sealed record ResticSnapshot(
     /// A copy of a snapshot into another repository has a new id but the same tree, paths,
     /// time and host; that is how an earlier copy is recognized.
     /// </summary>
+    public const string IncompleteTag = "incomplete";
+
+    /// <summary>The backup that made it could not read everything. Restic saves such a snapshot all the same.</summary>
+    public bool IsIncomplete => Tags?.Contains(IncompleteTag) == true;
+
     public bool SameContentAs(ResticSnapshot other) =>
         Tree == other.Tree && Time == other.Time && Hostname == other.Hostname && Paths.SequenceEqual(other.Paths);
 }

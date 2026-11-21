@@ -69,6 +69,20 @@ public sealed partial class ResticClient(IProcessRunner runner, ResticOptions? o
 
     public const int MaxPlanItems = 500;
 
+    public async Task TagAsync(ResticRepository repository, string snapshotId, string tag, CancellationToken cancellationToken = default)
+    {
+        ValidateSnapshotIds([snapshotId]);
+        if (!TagPattern().IsMatch(tag))
+        {
+            throw new ExternalToolException("tag_invalid", "A tag is made of letters, digits, '-' and '_'.");
+        }
+
+        Ensure(repository, await RunRawAsync(repository, ["tag", "--add", tag, "--", snapshotId], null, cancellationToken));
+    }
+
+    [GeneratedRegex("^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")]
+    private static partial Regex TagPattern();
+
     public async Task UnlockAsync(ResticRepository repository, CancellationToken cancellationToken = default) =>
         Ensure(repository, await RunRawAsync(repository, ["unlock"], null, cancellationToken));
 
