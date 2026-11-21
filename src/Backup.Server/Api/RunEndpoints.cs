@@ -3,6 +3,7 @@ using Backup.App.Planning;
 using Backup.Core;
 using Backup.Core.Runs;
 using Backup.Infra.Logging;
+using Backup.Infra.Persistence;
 
 namespace Backup.Server.Api;
 
@@ -55,6 +56,16 @@ public static class RunEndpoints
             }
 
             return new RunLogDto([.. log.Tail(id, Math.Clamp(lines ?? 500, 1, 5000))]);
+        });
+
+        // The whole list of what a step does, as a text file to save. The plan on the screen shows only the start of it.
+        api.MapGet("/{id}/steps/{stepId}/diff", (string id, string stepId, RunCatalog runs, IPlanDiffStore diffs) =>
+        {
+            Run run = runs.Find(id) ?? throw new DomainException("run_not_found", "The run does not exist.");
+            RunStep step = run.Steps.Find(s => s.Id == stepId) ?? throw new DomainException("step_not_found", "The step does not exist.");
+            Stream stream = (step.HasDiff ? diffs.Open(run.Id, step.Id) : null)
+                ?? throw new DomainException("diff_not_found", "This step has no complete diff.");
+            return Results.Stream(stream, "text/plain; charset=utf-8", $"my_backup_diff_{run.Id}_{step.Kind}.txt");
         });
 
         api.MapPost("/{id}/start", (string id, StartRequest request, RunService service) => service.Start(id, request.AcknowledgeDestructive));
