@@ -370,4 +370,16 @@ export const en = {
     'The run stopped, and what this restore had written so far was removed, because a half-written file can look whole.',
   'step.note.partial_output_left':
     'The run stopped, but what this restore had written could not be removed. Delete the folder by hand before you use it.',
+  'repo.incomplete': 'Incomplete',
+  'repo.incomplete.hint':
+    'The backup could not read every file. It is not used as the newest copy while a complete snapshot exists, and a clean-up never leaves it alone.',
+  'step.note.newer_snapshot_incomplete': 'A newer snapshot is incomplete, so the newest complete snapshot is used.',
+  'step.note.only_incomplete_snapshots': 'Every snapshot of this repository is incomplete. The newest of them is used.',
+  'step.note.incomplete_not_marked': 'The incomplete snapshot could not be marked as such.',
+  'error.forget_would_remove_last_complete':
+    'This would remove every complete snapshot and leave only incomplete ones. Keep more snapshots, or remove the incomplete ones by choice.',
+  'error.bad_request': 'The request is not valid.',
+  'error.data_dir_in_use': 'Another instance of the application is using the data directory.',
+  'error.object_password_invalid': 'The password must not contain a null character.',
+  'error.tag_invalid': 'The tag is not valid.',
 } as const

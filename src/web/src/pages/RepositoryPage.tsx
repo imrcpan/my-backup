@@ -16,6 +16,7 @@ import { CheckDialog } from '@/components/check-dialog'
 import { Page } from '@/components/page'
 import { RestoreDialog } from '@/components/restore-dialog'
 import { RetentionDialog } from '@/components/retention-dialog'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -200,7 +201,18 @@ export function RepositoryPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col">
-                            <span>{formatTime(item.time, locale)}</span>
+                            <span className="flex items-center gap-2">
+                              {formatTime(item.time, locale)}
+                              {item.incomplete && (
+                                <Badge
+                                  variant="outline"
+                                  className="border-amber-500/40 text-amber-600 dark:text-amber-400"
+                                  title={t('repo.incomplete.hint')}
+                                >
+                                  {t('repo.incomplete')}
+                                </Badge>
+                              )}
+                            </span>
                             <span className="font-mono text-xs text-muted-foreground">{item.shortId}</span>
                           </div>
                         </TableCell>

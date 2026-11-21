@@ -107,6 +107,7 @@ export type Snapshot = {
   hostname: string
   files?: number
   bytes?: number
+  incomplete: boolean
 }
 
 export type SnapshotNode = { name: string; type: string; path: string; size?: number; mtime?: string }

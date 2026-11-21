@@ -362,4 +362,15 @@ export const zh: Record<keyof typeof en, string> = {
   'step.note.partial_output_removed':
     '执行已停止，这次恢复已经写入的内容都被清除了，因为写了一半的文件可能看起来像是完整的。',
   'step.note.partial_output_left': '执行已停止，但这次恢复写入的内容没能清除。使用之前请手动删除这个文件夹。',
+  'repo.incomplete': '不完整',
+  'repo.incomplete.hint': '这次备份没能读取全部文件。只要还有完整的快照，它就不会被当作最新版，清理时也不会只剩下它。',
+  'step.note.newer_snapshot_incomplete': '更新的快照不完整，所以使用最新的完整快照。',
+  'step.note.only_incomplete_snapshots': '这个仓库里所有快照都不完整，使用其中最新的一个。',
+  'step.note.incomplete_not_marked': '没能把这个不完整的快照标记出来。',
+  'error.forget_would_remove_last_complete':
+    '这样会删掉所有完整的快照，只剩下不完整的。请多保留一些，或者手动选择删除不完整的快照。',
+  'error.bad_request': '请求无效。',
+  'error.data_dir_in_use': '另一个实例正在使用这个数据目录。',
+  'error.object_password_invalid': '密码不能包含空字符。',
+  'error.tag_invalid': '标签无效。',
 }
