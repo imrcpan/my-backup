@@ -24,6 +24,7 @@ ErrorMapping.Use(app);
 
 app.MapGet("/api/ping", () => new Pong("ok"));
 DeviceEndpoints.Map(app);
+DiskEndpoints.Map(app);
 GroupEndpoints.Map(app);
 SnapshotEndpoints.Map(app);
 RunEndpoints.Map(app);

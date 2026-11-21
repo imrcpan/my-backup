@@ -35,6 +35,7 @@ public static class AppSetup
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<IProcessRunner, ProcessRunner>();
         services.AddSingleton<IDiskProbe>(_ => new DiskProbe());
+        services.AddSingleton<IDiskLister>(sp => new DiskLister(sp.GetRequiredService<IProcessRunner>()));
         services.AddSingleton<IDeviceResolver>(sp => new DeviceResolver(sp.GetRequiredService<IDiskProbe>()));
         services.AddSingleton<IResticClient>(sp =>
         {
