@@ -373,4 +373,5 @@ export const zh: Record<keyof typeof en, string> = {
   'error.data_dir_in_use': '另一个实例正在使用这个数据目录。',
   'error.object_password_invalid': '密码不能包含空字符。',
   'error.tag_invalid': '标签无效。',
+  'app.github': '在 GitHub 上查看源码',
 }

@@ -382,4 +382,5 @@ export const en = {
   'error.data_dir_in_use': 'Another instance of the application is using the data directory.',
   'error.object_password_invalid': 'The password must not contain a null character.',
   'error.tag_invalid': 'The tag is not valid.',
+  'app.github': 'Source code on GitHub',
 } as const

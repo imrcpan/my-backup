@@ -1,8 +1,11 @@
 import { CheckIcon, LanguagesIcon, MonitorIcon, MoonIcon, SunIcon } from 'lucide-react'
+import { GithubIcon } from '@/components/github-icon'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useTheme, type Theme } from '@/components/theme-provider'
 import { useI18n, type Locale, type MessageKey } from '@/lib/i18n'
+
+const repository = 'https://github.com/imrcpan/my-backup'
 
 const themes: { value: Theme; label: MessageKey; icon: typeof SunIcon }[] = [
   { value: 'light', label: 'theme.light', icon: SunIcon },
@@ -23,6 +26,15 @@ export function Preferences() {
 
   return (
     <div className="flex items-center gap-1">
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label={t('app.github')}
+        title={t('app.github')}
+        render={<a href={repository} target="_blank" rel="noopener noreferrer" />}
+      >
+        <GithubIcon />
+      </Button>
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label={t('language.toggle')} />}>
           <LanguagesIcon />
