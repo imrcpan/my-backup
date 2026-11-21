@@ -26,6 +26,12 @@ public sealed partial class RunService(
     private readonly object _gate = new();
     private readonly Dictionary<string, (CancellationTokenSource Cancel, Task Done)> _active = [];
 
+    /// <summary>The folders that restores are writing into right now, so that what a stopped restore wrote can be removed.</summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, RestoreOutput> _restoreOutputs = new();
+
+    /// <param name="CreatedRoot">The highest folder that did not exist before the restore; null if the target existed.</param>
+    private sealed record RestoreOutput(string Target, string? CreatedRoot);
+
     public Run Register(Run plan)
     {
         runs.Add(plan);

@@ -11,6 +11,11 @@ public sealed class FakeRestic : IResticClient
 
     public int Backups { get; private set; }
 
+    public List<ResticSnapshot> Snapshots { get; } = [];
+
+    public Func<string, string, CancellationToken, Task<ResticRestoreSummary>> OnRestore { get; set; } =
+        (_, _, _) => throw new NotSupportedException();
+
     public List<string> Unlocked { get; } = [];
 
     public Task UnlockAsync(ResticRepository repository, CancellationToken cancellationToken = default)
@@ -32,11 +37,13 @@ public sealed class FakeRestic : IResticClient
 
     public Task InitAsync(ResticRepository repository, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
-    public Task<IReadOnlyList<ResticSnapshot>> SnapshotsAsync(ResticRepository repository, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<IReadOnlyList<ResticSnapshot>> SnapshotsAsync(ResticRepository repository, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<ResticSnapshot>>([.. Snapshots]);
 
     public Task<IReadOnlyList<ResticNode>> ListAsync(ResticRepository repository, string snapshotId, string directory, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
-    public Task<ResticRestoreSummary> RestoreAsync(ResticRepository repository, string snapshotId, string targetDirectory, IReadOnlyList<string>? paths = null, Action<ResticRestoreProgress>? onProgress = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<ResticRestoreSummary> RestoreAsync(ResticRepository repository, string snapshotId, string targetDirectory, IReadOnlyList<string>? paths = null, Action<ResticRestoreProgress>? onProgress = null, CancellationToken cancellationToken = default) =>
+        OnRestore(snapshotId, targetDirectory, cancellationToken);
 
     public Task<ResticForgetPlan> PlanForgetAsync(ResticRepository repository, RetentionPolicy policy, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 

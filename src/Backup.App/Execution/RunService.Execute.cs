@@ -44,6 +44,7 @@ public sealed partial class RunService
                 try
                 {
                     await RunStepAsync(context, runId, step, cancellationToken);
+                    _restoreOutputs.TryRemove(step.Id, out _);
                     runs.Update(runId, _ =>
                     {
                         step.State = StepState.Succeeded;
@@ -56,18 +57,21 @@ public sealed partial class RunService
                     SetStep(runId, step, StepState.Cancelled);
                     Log(runId, redactor, $"{Describe(step, context)}: cancelled.");
                     cancelled = true;
+                    await CleanUpAsync(context, runId, step);
                 }
                 catch (DomainException error)
                 {
                     failed = true;
                     Fail(runId, step, redactor, error.Code, error.Message);
                     Log(runId, redactor, $"{Describe(step, context)}: failed ({error.Code}): {error.Message}");
+                    await CleanUpAsync(context, runId, step);
                 }
                 catch (ExternalToolException error)
                 {
                     failed = true;
                     Fail(runId, step, redactor, error.Code, error.Message);
                     Log(runId, redactor, $"{Describe(step, context)}: failed ({error.Code}): {error.Message}");
+                    await CleanUpAsync(context, runId, step);
                 }
                 catch (Exception error) when (error is not OperationCanceledException)
                 {
@@ -75,6 +79,7 @@ public sealed partial class RunService
                     failed = true;
                     Fail(runId, step, redactor, "unexpected", error.Message);
                     Log(runId, redactor, $"{Describe(step, context)}: unexpected error: {error}");
+                    await CleanUpAsync(context, runId, step);
                 }
             }
         }
@@ -224,8 +229,10 @@ public sealed partial class RunService
                     ResolvedLocation to = Resolve(context, step.TargetObjectId, forWrite: true);
                     await EnsureRemoteAsync(from, cancellationToken);
                     string snapshot = step.Arguments.SnapshotPath == null ? step.Arguments.SnapshotId! : $"{step.Arguments.SnapshotId}:{step.Arguments.SnapshotPath}";
+                    string directory = to.FileSystemPath ?? throw new DomainException("target_not_a_directory", "The target is not a directory.");
+                    BeginRestoreOutput(step, directory);
                     await restic.RestoreAsync(
-                        Repository(from), snapshot, to.FileSystemPath ?? throw new DomainException("target_not_a_directory", "The target is not a directory."),
+                        Repository(from), snapshot, directory,
                         null, p => Progress(runId, step, p.PercentDone, p.BytesRestored), cancellationToken);
                     break;
                 }
@@ -234,6 +241,7 @@ public sealed partial class RunService
                 {
                     ResolvedLocation from = Resolve(context, step.TargetObjectId, forWrite: false);
                     await EnsureRemoteAsync(from, cancellationToken);
+                    BeginRestoreOutput(step, step.Arguments.TargetDirectory!);
                     await restic.RestoreAsync(
                         Repository(from), step.Arguments.SnapshotId!, step.Arguments.TargetDirectory!,
                         step.Arguments.Paths.Count == 0 ? null : step.Arguments.Paths,
@@ -284,6 +292,101 @@ public sealed partial class RunService
                 }
         }
     }
+
+    /// <summary>
+    /// Notes what a restore is about to write. The target must be new or empty, so everything that is
+    /// in it afterwards was written by this restore; if it is not empty, nothing is noted and nothing will ever be removed.
+    /// </summary>
+    private void BeginRestoreOutput(RunStep step, string target)
+    {
+        string full = Path.GetFullPath(target);
+        if (File.Exists(full) || (Directory.Exists(full) && Directory.EnumerateFileSystemEntries(full).Any()))
+        {
+            throw new DomainException("restore_target_not_empty", "A snapshot is restored only into a new or empty directory.");
+        }
+
+        string? createdRoot = null;
+        for (string? path = full; path != null && !Directory.Exists(path); path = Path.GetDirectoryName(path))
+        {
+            createdRoot = path;
+        }
+
+        _restoreOutputs[step.Id] = new RestoreOutput(full, createdRoot);
+    }
+
+    /// <summary>
+    /// After a step that did not end well: removes the stale locks the stopped programs left in the repositories
+    /// it used, and removes what a restore had written, since its files can have their full size and
+    /// still miss their content. Nothing that an earlier step did is touched.
+    /// </summary>
+    private async Task CleanUpAsync(Context context, string runId, RunStep step)
+    {
+        SecretRedactor redactor = context.Redactor;
+        using CancellationTokenSource limit = new(TimeSpan.FromSeconds(60));
+
+        foreach (string objectId in RepositoriesUsedBy(step, context))
+        {
+            try
+            {
+                ResolvedLocation location = Resolve(context, objectId, forWrite: false);
+                await restic.UnlockAsync(Repository(location), limit.Token);
+            }
+            catch (Exception error) when (error is DomainException or ExternalToolException or OperationCanceledException)
+            {
+                Log(runId, redactor, $"Stale locks could not be removed from {objectId}: {error.Message}");
+            }
+        }
+
+        if (!_restoreOutputs.TryRemove(step.Id, out RestoreOutput? output))
+        {
+            return;
+        }
+
+        try
+        {
+            int removed = 0;
+            if (Directory.Exists(output.Target))
+            {
+                foreach (string entry in Directory.EnumerateFileSystemEntries(output.Target))
+                {
+                    if (Directory.Exists(entry) && new DirectoryInfo(entry).LinkTarget == null)
+                    {
+                        Directory.Delete(entry, recursive: true);
+                    }
+                    else
+                    {
+                        File.Delete(entry);
+                    }
+
+                    removed++;
+                }
+            }
+
+            if (output.CreatedRoot != null && Directory.Exists(output.CreatedRoot))
+            {
+                Directory.Delete(output.CreatedRoot, recursive: true);
+            }
+
+            if (removed > 0)
+            {
+                runs.Update(runId, _ => step.Notes.Add("partial_output_removed"));
+                Log(runId, redactor, $"Removed what the stopped restore had written into {output.Target}.");
+            }
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            runs.Update(runId, _ => step.Notes.Add("partial_output_left"));
+            Log(runId, redactor, $"What the stopped restore had written into {output.Target} could not be removed: {error.Message}");
+        }
+    }
+
+    private IEnumerable<string> RepositoriesUsedBy(RunStep step, Context context) => step.Kind switch
+    {
+        StepKind.ResticBackup or StepKind.Forget or StepKind.Prune or StepKind.Check or StepKind.Restore => [step.TargetObjectId],
+        StepKind.ResticCopy => [context.SourceObjectId, step.TargetObjectId],
+        StepKind.RestoreToDirectory => [context.SourceObjectId],
+        _ => [],
+    };
 
     private async Task EnsureRemoteAsync(ResolvedLocation location, CancellationToken cancellationToken)
     {
