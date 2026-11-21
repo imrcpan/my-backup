@@ -87,7 +87,7 @@ export function ObjectDialog({
         <form
           id="object-form"
           // The fields scroll when the window is too low; the title and the buttons stay in view.
-          className="-mx-1 max-h-[60vh] overflow-y-auto px-1"
+          className="-mx-4 max-h-[60vh] overflow-y-auto px-4"
           onSubmit={(event) => {
             event.preventDefault()
             save.mutate()
