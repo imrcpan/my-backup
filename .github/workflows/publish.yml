@@ -7,6 +7,9 @@ name: Publish
 #   my_backup_linux_<version>_x64.tar.gz
 #   my_backup_linux_<version>_arm64.tar.gz
 #
+# No cache is used (no cache: in setup-node, none in setup-dotnet, no actions/cache): every build starts clean.
+# The archives kept as workflow artifacts are kept for 1 day, the shortest time there is.
+#
 # Everything runs on ubuntu-latest, which is x64. The arm64 program is cross-compiled there; no arm runner is used.
 on:
   workflow_dispatch:
@@ -16,7 +19,7 @@ on:
         required: true
         type: string
       dry_run:
-        description: "Build and keep the archives as workflow artifacts, but make no release"
+        description: "Build and keep the archives as workflow artifacts (for one day), but make no release"
         required: false
         default: false
         type: boolean
@@ -133,7 +136,7 @@ jobs:
           name: my_backup_linux_${{ inputs.version }}_${{ matrix.arch }}
           path: my_backup_linux_${{ inputs.version }}_${{ matrix.arch }}.tar.gz
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
 
   release:
     name: Make the release
