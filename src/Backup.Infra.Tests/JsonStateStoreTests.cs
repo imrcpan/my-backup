@@ -84,4 +84,36 @@ public sealed class JsonStateStoreTests : IDisposable
         StorageObject item = second.Read((_, groups) => groups.Get(group).Objects.Single());
         Assert.Equal(("/backups/docs", "pw"), (item.Path, item.Password));
     }
+
+    [Fact]
+    public void A_file_written_by_another_version_with_fields_that_are_not_known_or_missing_is_still_read()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(StatePath)!);
+        File.WriteAllText(StatePath, """
+            {
+              "FutureSetting": {"a": [1,2,3]},
+              "Devices": [{"Id":"media","Name":"Media","Kind":"ExternalDisk","Uuid":"1234-ABCD","Colour":"red"}],
+              "Groups": [{"Id":"g1","Name":"G","Note":"hello","Objects":[{"Id":"o1","DeviceId":"media","Path":"/x","Encrypted":false}]}]
+            }
+            """);
+
+        AppState state = new JsonStateStore(StatePath).Load();
+
+        Assert.Equal("media", Assert.Single(state.Devices).Id);
+        StorageObject item = Assert.Single(Assert.Single(state.Groups).Objects);
+        Assert.Equal("/x", item.Path);
+        Assert.Null(item.Password);
+        Assert.Null(item.Retention);
+    }
+
+    [Fact]
+    public void A_value_of_an_enum_that_is_not_known_is_reported_as_a_corrupt_file_and_the_file_is_kept()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(StatePath)!);
+        const string content = """{"Devices":[{"Id":"d","Name":"D","Kind":"Floppy"}]}""";
+        File.WriteAllText(StatePath, content);
+
+        Assert.Equal("state_corrupt", Assert.Throws<DomainException>(() => new JsonStateStore(StatePath).Load()).Code);
+        Assert.Equal(content, File.ReadAllText(StatePath));
+    }
 }
