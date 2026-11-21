@@ -43,9 +43,9 @@ public sealed class DiskProbeTests : IDisposable
     [Fact]
     public void Mounted_disk_gives_its_mount_point()
     {
-        DiskStatus status = Probe(["40 25 8:17 / /run/media/prc/MEDIA rw,relatime - exfat {dev}/sdb1 rw"]).Check("1234-ABCD");
+        DiskStatus status = Probe(["40 25 8:17 / /run/media/user/MEDIA rw,relatime - exfat {dev}/sdb1 rw"]).Check("1234-ABCD");
         Assert.Equal(DiskState.Mounted, status.State);
-        Assert.Equal("/run/media/prc/MEDIA", status.MountPoint);
+        Assert.Equal("/run/media/user/MEDIA", status.MountPoint);
         Assert.False(status.ReadOnly);
     }
 
@@ -59,7 +59,7 @@ public sealed class DiskProbeTests : IDisposable
     public void Read_only_mount_is_reported_and_whole_mount_is_preferred_over_a_bind_of_a_subdirectory()
     {
         DiskStatus status = Probe([
-            "41 25 8:17 /photos /home/prc/photos rw - ext4 {dev}/sdb1 rw",
+            "41 25 8:17 /photos /home/user/photos rw - ext4 {dev}/sdb1 rw",
             "40 25 8:17 / /mnt/m ro,relatime - ext4 {dev}/sdb1 rw",
         ]).Check("1234-ABCD");
         Assert.Equal("/mnt/m", status.MountPoint);

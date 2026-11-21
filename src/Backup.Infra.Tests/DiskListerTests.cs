@@ -9,7 +9,7 @@ public sealed class DiskListerTests : IDisposable
         {"blockdevices": [
           {"name":"sda","path":"/dev/sda","uuid":null,"label":null,"size":2000365289472,"fstype":null,"mountpoints":[],"rm":false,"hotplug":true,"tran":"usb","model":"WDC WD20SDRW ",
            "children":[
-             {"name":"sda1","path":"/dev/sda1","uuid":"65D1AEB5D3D9ECD5","label":"Media","size":2000363192320,"fstype":"ntfs","mountpoints":[null,"/run/media/prc/Media"],"rm":false,"hotplug":true,"tran":null,"model":null},
+             {"name":"sda1","path":"/dev/sda1","uuid":"65D1AEB5D3D9ECD5","label":"Media","size":2000363192320,"fstype":"ntfs","mountpoints":[null,"/run/media/user/Media"],"rm":false,"hotplug":true,"tran":null,"model":null},
              {"name":"sda2","path":"/dev/sda2","uuid":"AAAA-BBBB","label":null,"size":1000,"fstype":"vfat","mountpoints":[],"rm":false,"hotplug":true,"tran":null,"model":null}]},
           {"name":"nvme0n1","path":"/dev/nvme0n1","uuid":null,"size":512000000000,"fstype":null,"mountpoints":[],"rm":false,"hotplug":false,"tran":"nvme","model":"Samsung",
            "children":[
@@ -42,7 +42,7 @@ public sealed class DiskListerTests : IDisposable
         Assert.Equal("WDC WD20SDRW", media.Model);
         Assert.Equal("usb", media.Transport);
         Assert.True(media.Removable);
-        Assert.Equal("/run/media/prc/Media", media.MountPoint);
+        Assert.Equal("/run/media/user/Media", media.MountPoint);
         Assert.Null(disks[1].MountPoint);
         Assert.False(disks[2].Removable);
         Assert.Equal("/boot/efi", disks[2].MountPoint);
