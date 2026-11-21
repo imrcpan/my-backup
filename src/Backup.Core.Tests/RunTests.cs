@@ -150,7 +150,9 @@ public class RunTests
     public void Only_the_newest_finished_runs_are_kept_and_unfinished_ones_never_dropped()
     {
         RunCatalog catalog = new(new MemoryRunStore(), Now);
+        // A run that is going is never dropped, however old it is (a plan that waits is another matter: it expires).
         Run waiting = Planned(at: Now.AddDays(-100));
+        waiting.State = RunState.Running;
         catalog.Add(waiting);
         for (int i = 0; i < RunCatalog.KeepFinished + 5; i++)
         {
