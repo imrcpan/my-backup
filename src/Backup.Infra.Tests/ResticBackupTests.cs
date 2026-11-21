@@ -54,6 +54,9 @@ public sealed class ResticBackupTests : IDisposable
         Assert.Equal(1, plan.FilesChanged);
         Assert.Equal(1, plan.FilesUnmodified);
         Assert.Equal(["modified", "new"], plan.Items.Select(i => i.Action).Order());
+        // Changed files come first in the order that is shown, and what is shown is the start of the whole list.
+        Assert.Equal("modified", plan.AllItems[0].Action);
+        Assert.Equal(plan.AllItems, plan.Items);
 
         ResticBackupSummary second = await _fx.Client.BackupAsync(_fx.Repository, _fx.Source, null, Ct);
         Assert.Equal(1, second.FilesNew);
@@ -99,6 +102,8 @@ public sealed class ResticBackupTests : IDisposable
         Assert.Equal(ResticClient.MaxPlanItems, plan.Items.Count);
         Assert.True(plan.ItemsTruncated);
         Assert.Equal(505, plan.FilesNew);
+        Assert.Equal(505, plan.AllItems.Count);
+        Assert.False(plan.AllItemsTruncated);
     }
 
     [Fact]

@@ -69,6 +69,9 @@ public sealed partial class ResticClient(IProcessRunner runner, ResticOptions? o
 
     public const int MaxPlanItems = 500;
 
+    /// <summary>How many entries of a plan are kept whole, for the complete diff that the user can download.</summary>
+    public const int MaxDiffItems = 1_000_000;
+
     public async Task TagAsync(ResticRepository repository, string snapshotId, string tag, CancellationToken cancellationToken = default)
     {
         ValidateSnapshotIds([snapshotId]);
@@ -256,7 +259,7 @@ public sealed partial class ResticClient(IProcessRunner runner, ResticOptions? o
                     && !message.Value.GetProperty("item").GetString()!.EndsWith('/'))
                 {
                     total++;
-                    if (items.Count < MaxPlanItems)
+                    if (items.Count < MaxDiffItems)
                     {
                         items.Add(new ResticPlanItem(
                             message.Value.GetProperty("action").GetString()!,
@@ -269,14 +272,20 @@ public sealed partial class ResticClient(IProcessRunner runner, ResticOptions? o
             captureOutput: false);
         Ensure(repository, result);
         JsonElement s = summary ?? throw new ExternalToolException("restic_output", "restic did not report a summary.");
+
+        // Changed files first, as they replace what is saved; then new ones; each group by path.
+        List<ResticPlanItem> all = [.. items.OrderBy(i => i.Action == "modified" ? 0 : 1).ThenBy(i => i.Path, StringComparer.Ordinal)];
+        List<ResticPlanItem> first = [.. all.Take(MaxPlanItems)];
         return new ResticBackupPlan(
             s.GetProperty("files_new").GetInt64(),
             s.GetProperty("files_changed").GetInt64(),
             s.GetProperty("files_unmodified").GetInt64(),
             s.GetProperty("total_bytes_processed").GetInt64(),
             s.GetProperty("data_added").GetInt64(),
-            items,
-            total > items.Count);
+            first,
+            total > first.Count,
+            all,
+            total > all.Count);
     }
 
     public async Task<ResticBackupSummary> BackupAsync(

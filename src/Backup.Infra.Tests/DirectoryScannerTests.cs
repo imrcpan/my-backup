@@ -39,6 +39,11 @@ public sealed class DirectoryScannerTests : IDisposable
         Assert.Equal(60, scan.Bytes);
         Assert.Equal(2, scan.First.Count);
         Assert.True(scan.Truncated);
+        // The whole list is kept too, by path, and the shown part is the start of it.
+        Assert.Equal(3, scan.All.Count);
+        Assert.False(scan.AllTruncated);
+        Assert.Equal(scan.All.Select(f => f.Path).Order(StringComparer.Ordinal), scan.All.Select(f => f.Path));
+        Assert.Equal(scan.All.Take(2), scan.First);
         Assert.All(scan.First, f => Assert.StartsWith(_root, f.Path));
     }
 
