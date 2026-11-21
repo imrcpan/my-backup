@@ -341,4 +341,12 @@ export const zh: Record<keyof typeof en, string> = {
   'check.percent': '读取数据的比例（%）',
   'check.plan': '生成计划',
   'groups.menu.snapshots': '快照与恢复',
+  'files.view': '查看文件',
+  'files.object.title': '文件',
+  'files.object.truncated': '只显示了前 {count} 项。',
+  'files.type.symlink': '链接',
+  'files.object.back': '返回备份组',
+  'error.object_is_a_repository': '加密对象里保存的是快照，请浏览快照。',
+  'error.path_escapes_object': '路径经过了链接，不会跟随链接。',
+  'error.object_not_a_folder': '这个对象不是文件夹。',
 }

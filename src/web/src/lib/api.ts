@@ -4,6 +4,7 @@ import type {
   DeviceInput,
   DeviceStatus,
   Directory,
+  FileListing,
   Group,
   RetentionPolicy,
   Run,
@@ -84,6 +85,8 @@ export const api = {
       request<void>('DELETE', `/api/groups/${enc(groupId)}/objects/${enc(objectId)}`),
     setRetention: (groupId: string, objectId: string, policy: RetentionPolicy | null) =>
       request<StorageObject>('PUT', `/api/groups/${enc(groupId)}/objects/${enc(objectId)}/retention`, { policy }),
+    objectFiles: (groupId: string, objectId: string, path: string) =>
+      request<FileListing>('GET', `/api/groups/${enc(groupId)}/objects/${enc(objectId)}/files?path=${enc(path)}`),
     snapshots: (groupId: string, objectId: string) =>
       request<Snapshot[]>('GET', `/api/groups/${enc(groupId)}/objects/${enc(objectId)}/snapshots`),
     files: (groupId: string, objectId: string, snapshotId: string, path: string) =>

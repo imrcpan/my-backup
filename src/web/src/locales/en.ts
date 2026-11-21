@@ -347,4 +347,12 @@ export const en = {
   'check.percent': 'Share of the data to read (%)',
   'check.plan': 'Make the plan',
   'groups.menu.snapshots': 'Snapshots and restore',
+  'files.view': 'View files',
+  'files.object.title': 'Files',
+  'files.object.truncated': 'Only the first {count} entries are shown.',
+  'files.type.symlink': 'Link',
+  'files.object.back': 'Back to the group',
+  'error.object_is_a_repository': 'An encrypted object holds snapshots. Browse those.',
+  'error.path_escapes_object': 'The path goes through a link, which is not followed.',
+  'error.object_not_a_folder': 'This object is not a folder.',
 } as const

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArchiveRestoreIcon,
   CalendarClockIcon,
+  FolderOpenIcon,
   KeyRoundIcon,
   LayersIcon,
   LockIcon,
@@ -250,6 +251,18 @@ export function GroupsPage() {
                                 <DropdownMenuItem onClick={() => setObjectTarget({ group, object })}>
                                   <PencilIcon />
                                   {t('common.edit')}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() =>
+                                    void navigate(
+                                      object.encrypted
+                                        ? `/groups/${group.id}/objects/${object.id}?latest=1`
+                                        : `/groups/${group.id}/objects/${object.id}/files`,
+                                    )
+                                  }
+                                >
+                                  <FolderOpenIcon />
+                                  {t('files.view')}
                                 </DropdownMenuItem>
                                 {object.encrypted && (
                                   <DropdownMenuItem

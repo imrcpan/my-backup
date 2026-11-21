@@ -5,6 +5,7 @@ import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { useI18n } from '@/lib/i18n'
 import { DevicesPage } from '@/pages/DevicesPage'
 import { GroupsPage } from '@/pages/GroupsPage'
+import { ObjectFilesPage } from '@/pages/ObjectFilesPage'
 import { RepositoryPage } from '@/pages/RepositoryPage'
 import { RunPage } from '@/pages/RunPage'
 import { RunsPage } from '@/pages/RunsPage'
@@ -30,6 +31,7 @@ export default function App() {
           <Route path="/runs" element={<RunsPage />} />
           <Route path="/runs/:id" element={<RunPage />} />
           <Route path="/groups/:groupId/objects/:objectId" element={<RepositoryPage />} />
+          <Route path="/groups/:groupId/objects/:objectId/files" element={<ObjectFilesPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </SidebarInset>

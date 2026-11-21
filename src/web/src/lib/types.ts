@@ -116,3 +116,13 @@ export type SystemInfo = {
   rclone: { available: boolean; version?: string }
   home: string
 }
+
+export type FileEntry = {
+  name: string
+  type: 'dir' | 'file' | 'symlink'
+  path: string
+  size?: number
+  modified?: string
+}
+
+export type FileListing = { entries: FileEntry[]; truncated: boolean }

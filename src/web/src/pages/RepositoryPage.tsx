@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import {
   ArchiveRestoreIcon,
@@ -56,6 +56,14 @@ export function RepositoryPage() {
   const snapshotId = params.get('snapshot') ?? ''
   const path = params.get('path') ?? '/'
   const snapshot = snapshots.data?.find((item) => item.id === snapshotId)
+  const wantsLatest = params.get('latest') === '1'
+
+  // "View files" lands here: open the newest snapshot so that the files are shown at once.
+  useEffect(() => {
+    if (!wantsLatest || !snapshots.data) return
+    const newest = [...snapshots.data].sort((a, b) => b.time.localeCompare(a.time))[0]
+    setParams(newest ? { snapshot: newest.id } : {}, { replace: true })
+  }, [wantsLatest, snapshots.data, setParams])
 
   const files = useQuery({
     queryKey: ['files', groupId, objectId, snapshotId, path],
