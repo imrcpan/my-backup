@@ -280,8 +280,15 @@ export function RepositoryPage() {
                     </TableHeader>
                     <TableBody>
                       {files.data.map((node) => (
-                        <TableRow key={node.path}>
-                          <TableCell className="pl-4">
+                        <TableRow
+                          key={node.path}
+                          className={node.type === 'dir' ? 'cursor-pointer' : undefined}
+                          onClick={
+                            node.type === 'dir' ? () => open({ snapshot: snapshotId, path: node.path }) : undefined
+                          }
+                        >
+                          {/* Choosing a file is not opening a folder. */}
+                          <TableCell className="pl-4" onClick={(event) => event.stopPropagation()}>
                             <Checkbox
                               aria-label={t('files.select')}
                               checked={picked.includes(node.path)}
@@ -294,11 +301,7 @@ export function RepositoryPage() {
                           </TableCell>
                           <TableCell>
                             {node.type === 'dir' ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => open({ snapshot: snapshotId, path: node.path })}
-                              >
+                              <Button variant="ghost" size="sm" className="cursor-pointer">
                                 <FolderIcon />
                                 {node.name}
                               </Button>

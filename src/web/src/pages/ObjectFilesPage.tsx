@@ -80,10 +80,14 @@ export function ObjectFilesPage() {
                 </TableHeader>
                 <TableBody>
                   {listing.data.entries.map((entry) => (
-                    <TableRow key={entry.path}>
+                    <TableRow
+                      key={entry.path}
+                      className={entry.type === 'dir' ? 'cursor-pointer' : undefined}
+                      onClick={entry.type === 'dir' ? () => open(entry.path) : undefined}
+                    >
                       <TableCell className="pl-4">
                         {entry.type === 'dir' ? (
-                          <Button variant="ghost" size="sm" onClick={() => open(entry.path)}>
+                          <Button variant="ghost" size="sm" className="cursor-pointer">
                             <FolderIcon />
                             {entry.name}
                           </Button>
