@@ -58,6 +58,7 @@ public static class AppSetup
         services.AddSingleton<RunPlanner>();
         services.AddSingleton<RunService>();
         services.AddSingleton<RepositoryReader>();
+        services.AddSingleton<ObjectBrowser>();
         return services;
     }
 }

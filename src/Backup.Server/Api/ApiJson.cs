@@ -31,6 +31,7 @@ public sealed record Pong(string Status);
 [JsonSerializable(typeof(StartRequest))]
 [JsonSerializable(typeof(RunLogDto))]
 [JsonSerializable(typeof(SnapshotDto[]))]
+[JsonSerializable(typeof(FileListingDto))]
 [JsonSerializable(typeof(ResticNode[]))]
 [JsonSerializable(typeof(SystemDto))]
 internal sealed partial class ApiJson : JsonSerializerContext;
