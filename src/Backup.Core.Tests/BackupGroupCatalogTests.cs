@@ -156,4 +156,41 @@ public class BackupGroupCatalogTests
         Assert.Empty(catalog.Groups);
         Assert.Equal("group_not_found", CodeOf(() => catalog.RemoveGroup(group.Id)));
     }
+
+    [Theory]
+    [InlineData("pass\0word")]
+    [InlineData("\0")]
+    public void A_password_with_a_null_character_is_refused_when_it_is_saved_and_not_when_a_run_starts(string password)
+    {
+        BackupGroupCatalog catalog = new();
+        string group = catalog.AddGroup("G").Id;
+
+        Assert.Equal("object_password_invalid", CodeOf(() => catalog.AddObject(group, "local", "/x", true, password)));
+        Assert.Empty(catalog.Get(group).Objects);
+
+        StorageObject item = catalog.AddObject(group, "local", "/x", true, "fine");
+        Assert.Equal("object_password_invalid", CodeOf(() => catalog.UpdateObject(group, item.Id, "local", "/x", true, password)));
+        Assert.Equal("fine", catalog.Get(group).Objects.Single().Password);
+    }
+
+    [Fact]
+    public void A_long_password_is_fine_up_to_the_limit_and_a_longer_one_is_refused()
+    {
+        BackupGroupCatalog catalog = new();
+        string group = catalog.AddGroup("G").Id;
+        catalog.AddObject(group, "local", "/a", true, new string('p', BackupGroupCatalog.MaxPasswordLength));
+        Assert.Equal("object_password_invalid", CodeOf(() => catalog.AddObject(group, "local", "/b", true, new string('p', BackupGroupCatalog.MaxPasswordLength + 1))));
+    }
+
+    [Theory]
+    [InlineData("pass word  with spaces ")]
+    [InlineData("ünï©ödé-密码-🔑")]
+    [InlineData("quotes \"'` $HOME ; | & <>")]
+    [InlineData("line\nbreak")]
+    public void Any_other_text_is_a_password_and_is_kept_exactly_as_it_was_typed(string password)
+    {
+        BackupGroupCatalog catalog = new();
+        string group = catalog.AddGroup("G").Id;
+        Assert.Equal(password, catalog.AddObject(group, "local", "/x", true, password).Password);
+    }
 }

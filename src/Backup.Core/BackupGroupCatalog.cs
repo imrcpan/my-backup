@@ -6,6 +6,8 @@ namespace Backup.Core;
 /// </summary>
 public sealed class BackupGroupCatalog
 {
+    public const int MaxPasswordLength = 1024;
+
     private readonly List<BackupGroup> _groups = [];
 
     public BackupGroupCatalog()
@@ -118,6 +120,12 @@ public sealed class BackupGroupCatalog
             if (string.IsNullOrEmpty(keep))
             {
                 throw new DomainException("object_password_required", "An encrypted object needs a password.");
+            }
+
+            // The password reaches restic in an environment variable, which cannot hold a null character.
+            if (keep.Contains('\0') || keep.Length > MaxPasswordLength)
+            {
+                throw new DomainException("object_password_invalid", $"The password must not contain a null character and must have at most {MaxPasswordLength} characters.");
             }
         }
 
