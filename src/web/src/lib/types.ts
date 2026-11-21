@@ -75,6 +75,8 @@ export type RunStep = {
   toChange: number
   toDelete: number
   bytes: number
+  bytesToDelete: number
+  hasDiff: boolean
   notes: string[]
   progress: number
   bytesDone: number
