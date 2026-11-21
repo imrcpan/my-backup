@@ -48,6 +48,22 @@ public sealed class SnapshotApiTests : IDisposable
     }
 
     [Fact]
+    public async Task A_snapshot_from_an_incomplete_backup_is_marked_as_such_in_the_list()
+    {
+        await Setup(2);
+        ResticClient restic = new(new ProcessRunner(), new ResticOptions(RcloneConfigFile: _api.RcloneConfig));
+        ResticRepository repository = new($"rclone:gdrive:{Path.Combine(_api.Cloud, "repo")}", "repo-pw");
+        string newest = (await restic.SnapshotsAsync(repository, TestContext.Current.CancellationToken))[^1].Id;
+        await restic.TagAsync(repository, newest, ResticSnapshot.IncompleteTag, TestContext.Current.CancellationToken);
+
+        JsonElement list = (await _api.Send("GET", $"/api/groups/{_group}/objects/{_repoId}/snapshots")).Body;
+
+        Assert.Equal(2, list.GetArrayLength());
+        Assert.Single(list.EnumerateArray(), s => s.GetProperty("incomplete").GetBoolean());
+        Assert.Single(list.EnumerateArray(), s => !s.GetProperty("incomplete").GetBoolean());
+    }
+
+    [Fact]
     public async Task The_files_of_a_snapshot_are_browsed_directory_by_directory_with_directories_first()
     {
         await Setup(1);

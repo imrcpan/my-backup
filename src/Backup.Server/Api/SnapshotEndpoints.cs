@@ -3,7 +3,8 @@ using Backup.Infra.Restic;
 
 namespace Backup.Server.Api;
 
-public sealed record SnapshotDto(string Id, string ShortId, DateTimeOffset Time, string[] Paths, string Hostname, long? Files, long? Bytes);
+/// <param name="Incomplete">The backup that made it could not read everything; see <see cref="ResticSnapshot.IncompleteTag"/>.</param>
+public sealed record SnapshotDto(string Id, string ShortId, DateTimeOffset Time, string[] Paths, string Hostname, long? Files, long? Bytes, bool Incomplete);
 
 public sealed record FileEntryDto(string Name, string Type, string Path, long? Size, DateTimeOffset? Modified);
 
@@ -12,7 +13,7 @@ public sealed record FileListingDto(FileEntryDto[] Entries, bool Truncated);
 public static class SnapshotEndpoints
 {
     public static SnapshotDto ToDto(ResticSnapshot snapshot) =>
-        new(snapshot.Id, snapshot.ShortId, snapshot.Time, snapshot.Paths, snapshot.Hostname, snapshot.Summary?.TotalFilesProcessed, snapshot.Summary?.TotalBytesProcessed);
+        new(snapshot.Id, snapshot.ShortId, snapshot.Time, snapshot.Paths, snapshot.Hostname, snapshot.Summary?.TotalFilesProcessed, snapshot.Summary?.TotalBytesProcessed, snapshot.IsIncomplete);
 
     public static void Map(WebApplication app)
     {
