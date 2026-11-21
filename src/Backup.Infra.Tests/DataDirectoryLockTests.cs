@@ -21,6 +21,7 @@ public sealed class DataDirectoryLockTests : IDisposable
             DomainException refused = Assert.Throws<DomainException>(() => DataDirectoryLock.Acquire(dir));
             Assert.Equal("data_dir_in_use", refused.Code);
             Assert.Contains(dir, refused.Message);
+            Assert.Contains($"(process {Environment.ProcessId})", refused.Message);
             Assert.NotNull(first);
         }
 
@@ -69,6 +70,43 @@ public sealed class DataDirectoryLockTests : IDisposable
 
         using DataDirectoryLock free = DataDirectoryLock.Acquire(dir);
         Assert.NotNull(free);
+    }
+
+    [Fact]
+    public void A_number_left_by_a_program_that_crashed_is_not_named_and_the_number_is_removed_at_the_end()
+    {
+        string dir = Path.Combine(_root, "crashed");
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, ".lock.pid"), "999999999");
+
+        using (DataDirectoryLock first = DataDirectoryLock.Acquire(dir))
+        {
+            Assert.Equal(Environment.ProcessId.ToString(), File.ReadAllText(Path.Combine(dir, ".lock.pid")));
+            Assert.NotNull(first);
+        }
+
+        Assert.False(File.Exists(Path.Combine(dir, ".lock.pid")));
+
+        // The lock file is held by a process that is not this one and left no number: the message does not guess one.
+        File.WriteAllText(Path.Combine(dir, ".lock.pid"), "999999999");
+        using System.Diagnostics.Process holder = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("flock")
+        {
+            ArgumentList = { "--exclusive", Path.Combine(dir, ".lock"), "sleep", "30" },
+            UseShellExecute = false,
+        })!;
+        DomainException refused = Assert.Throws<DomainException>(() => WaitUntilRefused(dir));
+        Assert.DoesNotContain("999999999", refused.Message);
+        Assert.DoesNotContain("(process", refused.Message);
+        holder.Kill(entireProcessTree: true);
+    }
+
+    private static void WaitUntilRefused(string dir)
+    {
+        for (int i = 0; i < 100; i++)
+        {
+            Thread.Sleep(50);
+            TryAcquire(dir);
+        }
     }
 
     private static void TryAcquire(string dir)
